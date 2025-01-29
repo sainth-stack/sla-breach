@@ -112,13 +112,11 @@ export const MainPages = () => {
 
   const calculateReport = () => {
     if (!csvData || csvData.length < 2) return null;
-  
     const headers = csvData[0];
     const creationIndex = headers.indexOf("Historical Status_Status To");
     const requestIdIndex = headers.indexOf("Request - ID");
     const changeIndex = headers.indexOf("Change");
     const ticketIndex = headers.indexOf(" ID");
-  
     const groupedData = csvData.slice(1).reduce((acc, item) => {
       const requestId = item[requestIdIndex];
       if (!acc[requestId]) {
@@ -127,7 +125,6 @@ export const MainPages = () => {
       acc[requestId].push(item);
       return acc;
     }, {});
-  
     const reports = Object.entries(groupedData).map(([requestId, records]) => {
       const lastRecord = records[records.length - 1];
       const status = lastRecord[creationIndex];
@@ -135,7 +132,6 @@ export const MainPages = () => {
         const time = parseFloat(record[changeIndex]) || 0;
         return sum + time;
       }, 0);
-  
       return {
         requestId,
         ticket: lastRecord[ticketIndex],
@@ -145,7 +141,6 @@ export const MainPages = () => {
         breached: elapsedTime > 40,
       };
     });
-  
     return reports;
   };
   
@@ -173,7 +168,7 @@ export const MainPages = () => {
   }
 
   const report = calculateReport();
-  console.log(report)
+  console.log(report);
   return (
     <div className="p-2 flex flex-col gap-2 items-start">
       <div className="card">
@@ -220,41 +215,35 @@ export const MainPages = () => {
           )}
         </div>
         {report && report.length > 0 && (
-  <div className="report-section">
-    <h2 className="report-heading">Report</h2>
-    <table>
-      <thead>
-        <tr>
-          <th>Ticket</th>
-          <th>Priority</th>
-          <th>Allowed Duration</th>
-          <th>Elapsed Time</th>
-          <th>Status To</th>
-          <th>Breached</th>
-        </tr>
-      </thead>
-      <tbody>
-        {report.map((item, index) => (
-          <tr key={index}>
-            <td>{item.requestId}</td>
-            <td>{item.priority}</td>
-            <td>40</td>
-            <td>{item.elapsedTime}</td>
-            <td>{item.status}</td>
-            <td>{item.breached ? "Yes" : "No"}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  </div>
-)}
-
-      </div>
-      {file && (
-        <div style={{ width: "100%" }}>
-          <LLMConfig file={file} />
-        </div>
-      )}
+          <div className="report-section">
+            <h2 className="report-heading">Report</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th>Ticket</th>
+                  <th>Priority</th>
+                  <th>Allowed Duration</th>
+                  <th>Elapsed Time</th>
+                  <th>Status To</th>
+                  <th>Breached</th>
+                </tr>
+              </thead>
+              <tbody>
+                {report.map((item, index) => (
+                  <tr key={index}>
+                    <td>{item.requestId}</td>
+                    <td>{item.priority}</td>
+                    <td>40</td>
+                    <td>{item.elapsedTime}</td>
+                    <td>{item.status}</td>
+                    <td>{item.breached ? "Yes" : "No"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div> 
     </div>
   );
 };
