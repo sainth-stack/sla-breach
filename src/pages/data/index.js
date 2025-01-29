@@ -10,15 +10,112 @@ export const MainPages = () => {
   );
   const [file, setFile] = useState(null);
 
+
+
+  const calculateWorkingHours = (data1) => {
+    const addChangeColumn = (data) => {
+      data[0].push("Change");
+      for (let i = 1; i < data.length; i++) {
+        data[i].push("");
+      }
+      return data;
+    };
+  
+    const data = addChangeColumn(data1);
+    const workingHoursStart = 8; // 8 AM
+    const workingHoursEnd = 17; // 5 PM
+    const workingHoursPerDay = workingHoursEnd - workingHoursStart;
+  
+    const tickets = {};
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      const ticketNumber = row[3]; // "Request - ID"
+      if (!tickets[ticketNumber]) {
+        tickets[ticketNumber] = [];
+      }
+      tickets[ticketNumber].push(row);
+    }
+  
+    Object.values(tickets).forEach((ticketRows) => {
+      const lastRow = ticketRows[ticketRows.length - 1];
+      const isSolved = lastRow[6] === "Solved";
+  
+      for (let i = 0; i < ticketRows.length; i++) {
+        const row = ticketRows[i];
+        const startDateTime = parseDateTime(`${row[7]} ${row[8]}`);
+        let currentDate = new Date(startDateTime);
+        let currentTime = new Date(startDateTime);
+  
+        let endDate;
+        if (i === ticketRows.length - 1) {
+          endDate = isSolved ? parseDateTime(`${row[7]} ${row[8]}`) : new Date();
+        } else {
+          endDate = parseDateTime(`${ticketRows[i + 1][7]} ${ticketRows[i + 1][8]}`);
+        }
+  
+        let totalWorkingHours = 0;
+  
+        while (currentDate <= endDate) {
+          if (currentDate.getDay() !== 0 && currentDate.getDay() !== 6) {
+            const startOfDay = new Date(currentDate);
+            startOfDay.setHours(workingHoursStart, 0, 0, 0);
+  
+            const endOfDay = new Date(currentDate);
+            endOfDay.setHours(workingHoursEnd, 0, 0, 0);
+  
+            if (currentTime < startOfDay) {
+              currentTime = startOfDay;
+            }
+  
+            if (currentTime > endOfDay) {
+              currentDate.setDate(currentDate.getDate() + 1);
+              currentTime = new Date(currentDate);
+              currentTime.setHours(workingHoursStart, 0, 0, 0);
+              continue;
+            }
+  
+            let endTime = new Date(endDate);
+            if (endTime > endOfDay) {
+              endTime = endOfDay;
+            }
+  
+            let hoursWorked = Math.max(0, (endTime - currentTime) / (1000 * 60 * 60));
+            totalWorkingHours += Math.min(hoursWorked, workingHoursPerDay);
+  
+            currentDate.setDate(currentDate.getDate() + 1);
+            currentTime = new Date(currentDate);
+            currentTime.setHours(workingHoursStart, 0, 0, 0);
+          } else {
+            currentDate.setDate(currentDate.getDate() + 1);
+          }
+        }
+  
+        row[row.length - 1] = `${totalWorkingHours.toFixed(2)} h`;
+      }
+    });
+  
+    setCsvData(data);
+  };
+  
+  const parseDateTime = (dateTimeString) => {
+    const [datePart, timePart] = dateTimeString.split(" ");
+    const [day, month, year] = datePart.split("/");
+    let [hours, minutes] = timePart.split(":");
+  
+    const date = new Date(`20${year}`, month - 1, day);
+    date.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
+  
+    return date;
+  };
+  
   const handleFileUpload = (event) => {
     setFile(event.target.files[0]);
     const file = event.target.files?.[0];
     if (file) {
       Papa.parse(file, {
         complete: (result) => {
-          setCsvData(result.data);
-          adjustDateColumns(result.data);
-        },
+          calculateWorkingHours(adjustDateColumns(result.data));
+      },      
         error: (error) => {
           console.error("Error parsing CSV:", error);
         },
@@ -41,9 +138,11 @@ export const MainPages = () => {
   };
 
   const adjustDateColumns = (csvData) => {
+    
     if (!csvData || !dateColumns) return;
 
     const columnNames = dateColumns.split(",").map((col) => col.trim());
+    console.log(columnNames)
     const headers = csvData[0];
 
     const updatedData = csvData.map((row, rowIndex) => {
@@ -54,6 +153,7 @@ export const MainPages = () => {
           try {
             const date = new Date(cell);
             if (!isNaN(date)) {
+              console.log(header)
               date.setHours(date.getHours() - 6); // Subtract 6 hours
               const options = {
                 year: "numeric",
@@ -106,8 +206,7 @@ export const MainPages = () => {
         return cell;
       });
     });
-
-    setCsvData(updatedData);
+return updatedData
   };
 
   const calculateReport = () => {
@@ -145,30 +244,7 @@ export const MainPages = () => {
   };
   
 
-  function getCumulativeTime(time1, time2, time3) {
-    // Convert time to seconds
-    const toSeconds = (time) => {
-      if (time) {
-        const [h, m, s] = time?.split(":").map(Number);
-        return h * 3600 + m * 60 + s;
-      } else return null;
-    };
-
-    // Convert seconds back to time
-    const toTime = (seconds) => {
-      const h = Math.floor(seconds / 3600);
-      // const m = Math.floor((seconds % 3600) / 60);
-      // const s = seconds % 60;
-      return `${h} hours`;
-    };
-
-    // Calculate total seconds and convert back to time
-    const totalSeconds = toSeconds(time1) + toSeconds(time2) + toSeconds(time3);
-    return toTime(totalSeconds);
-  }
-
   const report = calculateReport();
-  console.log(report);
   return (
     <div className="p-2 flex flex-col gap-2 items-start">
       <div className="card">
