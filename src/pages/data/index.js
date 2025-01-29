@@ -111,33 +111,42 @@ export const MainPages = () => {
   };
 
   const calculateReport = () => {
-    if (!csvData) return null;
+    if (!csvData || csvData.length < 2) return null;
 
     const headers = csvData[0];
     const creationIndex = headers.indexOf("Historical Status_Status To");
-    const suspendedIndex = headers.indexOf("Change");
-    const change1 = csvData.filter(
-      (item) => item[creationIndex] == "Suspended"
-    );
-    const change2 = csvData.filter((item) => item[creationIndex] == "Solved");
-    const change3 = csvData.filter(
-      (item) => item[creationIndex] == "Work in progress"
-    );
-    console.log(csvData);
-    const data = {
-      time1: getCumulativeTime(
-        change1[0][suspendedIndex],
-        change2[0][suspendedIndex],
-        change3[0][suspendedIndex]
-      ),
-      time2: getCumulativeTime(
-        change1[0][suspendedIndex],
-        change2[0][suspendedIndex]
-      ),
-      ticket: csvData[1][4],
-      priority: csvData[1][3],
-    };
-    return data;
+    const requestIdIndex = headers.indexOf("Request - ID");
+    const changeIndex = headers.indexOf("Change");
+    const ticketIndex = headers.indexOf(" ID");
+
+    const groupedData = csvData.slice(1).reduce((acc, item) => {
+      const requestId = item[requestIdIndex];
+      if (!acc[requestId]) {
+        acc[requestId] = [];
+      }
+      acc[requestId].push(item);
+      return acc;
+    }, {});
+
+    const reports = Object.entries(groupedData).map(([requestId, records]) => {
+      const lastRecord = records[records.length - 1];
+      const status = lastRecord[creationIndex];
+      const elapsedTime = records.reduce((sum, record) => {
+        const time = parseFloat(record[changeIndex]) || 0;
+        return sum + time;
+      }, 0);
+
+      return {
+        requestId,
+        ticket: lastRecord[ticketIndex],
+        priority: lastRecord[headers.indexOf("Request - Priority")],
+        status,
+        elapsedTime,
+        breached: elapsedTime > 40,
+      };
+    });
+
+    return reports;
   };
 
   function getCumulativeTime(time1, time2, time3) {
@@ -163,6 +172,7 @@ export const MainPages = () => {
   }
 
   const report = calculateReport();
+  console.log(report);
   return (
     <div className="p-2 flex flex-col gap-2 items-start">
       <div className="card">
@@ -208,34 +218,36 @@ export const MainPages = () => {
             </div>
           )}
         </div>
-        {report && (
+        {report && report.length > 0 && (
           <div className="report-section">
             <h2 className="report-heading">Report</h2>
-            {/* <p className="report-text">Suspended Time - {report?.time2}</p> */}
             <table>
               <thead>
-                <td>Ticket</td>
-                <td>Priority</td>
-                <td>Allowed Duration</td>
-                <td>Elapsed Time</td>
-                <td>Status To</td>
+                <tr>
+                  <th>Ticket</th>
+                  <th>Priority</th>
+                  <th>Allowed Duration</th>
+                  <th>Elapsed Time</th>
+                  <th>Status To</th>
+                  <th>Breached</th>
+                </tr>
               </thead>
               <tbody>
-              <td>{report?.priority}</td>
-                <td>{report?.ticket}</td>
-                <td>40</td>
-                <td>{report?.time1}</td>
-                <td>{report?.status}</td>
+                {report.map((item, index) => (
+                  <tr key={index}>
+                    <td>{item.requestId}</td>
+                    <td>{item.priority}</td>
+                    <td>40</td>
+                    <td>{item.elapsedTime}</td>
+                    <td>{item.status}</td>
+                    <td>{item.breached ? "Yes" : "No"}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
         )}
-      </div>
-      {file && (
-        <div style={{ width: "100%" }}>
-          <LLMConfig file={file} />
-        </div>
-      )}
+      </div> 
     </div>
   );
 };
