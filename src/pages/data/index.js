@@ -6,7 +6,7 @@ import { LLMConfig } from "../llm-config";
 export const MainPages = () => {
   const [csvData, setCsvData] = useState(null);
   const [dateColumns, setDateColumns] = useState(
-    "Creation_Time,Creation Time,startdate,Historical,Creation Time"
+    "Creation_Time,Creation Time,Startdate,Historical,Creation Time"
   );
   const [file, setFile] = useState(null);
 
@@ -86,10 +86,10 @@ export const MainPages = () => {
               const reducedHours = currentDate.getHours();
               const reducedMinutes = currentDate.getMinutes();
               const reducedSeconds = currentDate.getSeconds();
-
-              const formattedPeriod = reducedHours >= 12 ? "AM" : "PM";
               const formattedHours =
                 reducedHours % 12 === 0 ? 12 : reducedHours % 12;
+
+              const formattedPeriod = formattedHours >= 12 ? "PM" : "AM";
               const formattedMinutes = reducedMinutes
                 .toString()
                 .padStart(2, "0");
