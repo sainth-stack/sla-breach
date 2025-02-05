@@ -44,12 +44,12 @@ export const MainPages = () => {
         const endDateTime = parseDateTime(row[7], row[8]);   
 
         if (startDateTime.getHours() > parseDateTime(row[7], row[8]).getHours() || endDateTime.getHours() > workingHoursEnd) {
-            row[row.length - 1] = "0.00 h";
+            row[row.length - 1] = "0:00 h";
         } else {
             const totalWorkingHours = calculateDecimalHours(startDateTime, endDateTime);
             const hours = Math.floor(totalWorkingHours);
             const minutes = Math.round((totalWorkingHours - hours) * 60);
-            row[row.length - 1] = `${hours}.${minutes.toString().padStart(2, '0')} h`;
+            row[row.length - 1] = `${hours}:${minutes.toString().padStart(2, '0')} h`;
         }
     }
 
@@ -250,19 +250,35 @@ const parseDateTime = (dateTimeString) => {
           const lastRecord = records[records.length - 1];
           const status = lastRecord?.length>0 ?lastRecord[statusToIndex]:'';
           const priority = lastRecord[priorityIndex];
-          const slaHours = prioritySLA[priority] || 40; // Default to 40 if priority not found
+          const slaHours = prioritySLA[priority] || 40;
 
           const elapsedTime = records.reduce((sum, record) => {
-              const time = parseFloat(record[changeIndex]) || 0;
-              return sum + time;
-          }, 0);
-
+            console.log(record[changeIndex]);
+            const timeParts = record[changeIndex].split(':'); // Split time format "H:MM"
+            
+            let timeInHours = 0;
+            if (timeParts.length === 2) {
+                const hours = parseInt(timeParts[0], 10) || 0;
+                const minutes = parseInt(timeParts[1], 10) || 0;
+                timeInHours = hours + minutes / 60; // Convert minutes into decimal hours
+            } else {
+                timeInHours = parseFloat(record[changeIndex]) || 0; // Fallback for decimal values
+            }
+        
+            return sum + timeInHours;
+        }, 0);
+        
+        // Convert total decimal hours into "H:MM h" format
+        const hours = Math.floor(elapsedTime);
+        const minutes = Math.round((elapsedTime - hours) * 60);
+        const formattedTime = `${hours}:${minutes.toString().padStart(2, '0')}`;
+        
           return {
               requestId,
               ticket: lastRecord[ticketIndex],
               priority,
               status,
-              elapsedTime: elapsedTime.toFixed(2),
+              elapsedTime: formattedTime,
               breached: elapsedTime > slaHours,
               totalTime: slaHours,
               assignedTo:lastRecord[assignedTo]
