@@ -10,7 +10,7 @@ function App() {
         <Routes>
           {/* <Route path="/" element={<MainPages />} /> */}
           <Route path="/" element={<AdminLayout />}>
-               <Route path="/" element={<MainPages />} />
+               <Route path="/" element={<Bot />} />
                <Route path="/bot" element={<Bot />} />
         </Route>
         </Routes>
