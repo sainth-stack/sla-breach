@@ -253,10 +253,10 @@ const validTransitions = [
   "Suspended to Solved",
   "Forwarded to Suspended"
 ];
+setCsvData([allowedHeaders,...filteredData]);
 
 const statusFromIndex = headers.indexOf("Historical Status - Status From")-1;
 const statusToIndex = headers.indexOf("Historical Status - Status To")-1;
-console.log(statusFromIndex,statusToIndex)
   const finalData=[...filteredData].filter((item)=>{
     const transition = `${item[statusFromIndex]} to ${item[statusToIndex]}`;
 if (validTransitions.includes(transition)) {
@@ -264,7 +264,7 @@ if (validTransitions.includes(transition)) {
 }
   })
 console.log(finalData,'sss')
-  setCsvData([allowedHeaders,...finalData]);
+  setCsvData2([allowedHeaders,...finalData]);
 };
 
 
@@ -425,7 +425,7 @@ const parseDateTime = (dateTimeString, timeStr) => {
   };
   
   const calculateReport = () => {
-    if (!csvData || csvData.length < 2) return null;
+    if (!csvData2 || csvData2.length < 2) return null;
     
     const prioritySLA = {
         "P1 - Critical": 4,
@@ -435,7 +435,7 @@ const parseDateTime = (dateTimeString, timeStr) => {
     };
 
 
-    const headers = csvData[0];
+    const headers = csvData2[0];
     const statusFromIndex = headers.indexOf("Historical Status - Status From");
     const statusToIndex = headers.indexOf("Req. Status - Description");
     const requestIdIndex = headers.indexOf("Request - ID");
@@ -446,7 +446,7 @@ const parseDateTime = (dateTimeString, timeStr) => {
     const creationDateIndex = headers.indexOf("Historical Status - Change Date");
 
     // Group data by request ID (removed date filtering)
-    const groupedData = csvData.slice(1).reduce((acc, item) => {
+    const groupedData = csvData2.slice(1).reduce((acc, item) => {
         const requestId = item[requestIdIndex];
         if (!acc[requestId]) {
             acc[requestId] = [];
