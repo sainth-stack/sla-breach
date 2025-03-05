@@ -10,7 +10,7 @@
   }
   
   /* Card Styling */
-  .card {
+  .card2 {
     background-color: #ffffff;
     /* box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); */
     border-radius: 12px;
@@ -28,12 +28,12 @@
   }
   
   /* Upload Section Styling */
-  .upload-section {
+  .upload-section2 {
     margin-bottom: 20px;
     text-align: center;
   }
   
-  .file-input {
+  .file-input2 {
     padding: 12px 16px;
     border: 2px dashed #007bff;
     border-radius: 8px;
@@ -41,7 +41,7 @@
     transition: border-color 0.3s;
   }
   
-  .file-input:hover {
+  .file-input2:hover {
     border-color: #0056b3;
   }
   
@@ -78,6 +78,7 @@
   .column-input-section {
     margin: 20px 0;
     text-align: center;
+    margin-left: 280px;
   }
   
   .column-label {
@@ -210,6 +211,7 @@
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     margin: 2rem auto;
     max-width: 1300px;
+    margin-left: 280px !important;
   }
   
   .report-heading {

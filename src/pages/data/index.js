@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import Papa from "papaparse";
 import "./index.css";
 import { LLMConfig } from "../llm-config";
+import * as XLSX from 'xlsx';
 
 export const MainPages = () => {
   const [csvData, setCsvData] = useState(null);
@@ -15,25 +16,25 @@ export const MainPages = () => {
     assignedTo: '',
     priority: '',
     allowedDuration: '',
-    elapsedTimeFrom: '',
-    elapsedTimeTo: '',
     breached: '',
-    status: ''
+    status: '',
+    creationDateFrom: '',
+    creationDateTo: '',
+    timeToBreachOption: 'eq',
+    timeToBreachValue: ''
   });
   const calculateWorkingHours = (data1) => {
+    console.log(data1)
     const addColumns = (data) => {
-        // Add both Change and Details columns
+        // Add only Change column
         const changeIndex = data[0].length;
-        const detailsIndex = changeIndex + 1;
         
-        // Add headers
+        // Add header
         data[0][changeIndex] = "Change";
-        data[0][detailsIndex] = "Details";
         
         // Add empty values for all rows
         for (let i = 1; i < data.length; i++) {
             data[i][changeIndex] = "";
-            data[i][detailsIndex] = "";
         }
         return data;
     };
@@ -43,10 +44,37 @@ export const MainPages = () => {
     const workingHoursStart = 14; // 2 PM
     const workingHoursEnd = 23; // 11 PM
 
-    const parseDateTime = (dateStr, timeStr) => {
-        const [day, month, year] = dateStr.split('/');
-        const [hours, minutes] = timeStr.split(':');
-        return new Date(year, month - 1, day, hours, minutes, 0);
+    const parseDateTime = (dateTimeString, timeStr) => {
+        try {
+            // Case 1: When date and time are passed separately (original CSV format)
+            if (timeStr !== undefined) {
+                const [day, month, year] = dateTimeString.split("/");
+                const [hours, minutes] = timeStr.split(":");
+                return new Date(`20${year}`, month - 1, day, parseInt(hours, 10), parseInt(minutes, 10), 0);
+            }
+
+            // Case 2: When it's a combined string (CSV format "DD/MM/YY HH:MM")
+            if (typeof dateTimeString === 'string' && dateTimeString.includes('/')) {
+                const [datePart, timePart] = dateTimeString.split(" ");
+                const [day, month, year] = datePart.split("/");
+                const [hours, minutes] = timePart.split(":");
+                return new Date(`20${year}`, month - 1, day, parseInt(hours, 10), parseInt(minutes, 10), 0);
+            }
+
+            // Case 3: When it's an Excel date (number or Date object)
+            if (dateTimeString instanceof Date) {
+                return dateTimeString;
+            }
+            if (typeof dateTimeString === 'number') {
+                return new Date(Math.round((dateTimeString - 25569) * 86400 * 1000));
+            }
+
+            // Fallback: Try to parse as is
+            return new Date(dateTimeString);
+        } catch (error) {
+            console.error("Error parsing date:", error, "Input:", dateTimeString, timeStr);
+            return new Date(); // Return current date as fallback
+        }
     };
 
     const isWeekend = (date) => {
@@ -146,7 +174,6 @@ export const MainPages = () => {
             statusTo: statusTo
         });
     }
-
     // Process each ticket's records
     for (const ticketId in ticketGroups) {
         const records = ticketGroups[ticketId].sort((a, b) => a.date - b.date);
@@ -174,39 +201,15 @@ export const MainPages = () => {
             const hours = Math.floor(result.hours);
             const minutes = Math.round((result.hours - hours) * 60);
             
-            // Find the indices for Change and Details columns
-            const changeIndex = currentRecord.row.length - 2;
-            const detailsIndex = currentRecord.row.length - 1;
+            // Find the index for Change column
+            const changeIndex = currentRecord.row.length - 1;
             
             // Set the Change column
             currentRecord.row[changeIndex] = 
                 `${hours}:${minutes.toString().padStart(2, '0')} h`;
-
-            // Format dates for details
-            const formatDateTime = (date) => {
-                if (!date) return 'N/A';
-                return date.toLocaleString('en-GB', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit',
-                    hour12: false
-                });
-            };
-
-            // Set the Details column
-            const details = [
-                `Start: ${formatDateTime(result.start)}`,
-                `End: ${formatDateTime(result.end)}`,
-                `Reason: ${result.reason}`
-            ].join(' | ');
-
-            currentRecord.row[detailsIndex] = details;
         }
     }
-
+console.log(data)
     updateTemplate(data);
 };
 
@@ -224,7 +227,7 @@ const allowedHeaders = [
   "Request - Resource Assigned To - Name",
   "Req. Status - Description",
   "Change",
-  "Details"
+  // "Details"
 ];
 
 const updateTemplate = (data) => {
@@ -240,24 +243,62 @@ const updateTemplate = (data) => {
   // Create filtered data with only allowed columns
   const filteredData = values.map(row => allowedIndices.map(index => row[index]));
 
-  // Set the filtered data, including the headers
-  setCsvData([allowedHeaders, ...filteredData]);
+
+const validTransitions = [
+  "Forwarded to Assigned",
+  "Forwarded to Work in progress",
+  "Assigned to Work in progress",
+  "Work in progress to Suspended",
+  "Work in progress to Solved",
+  "Suspended to Solved",
+  "Forwarded to Suspended"
+];
+
+const statusFromIndex = headers.indexOf("Historical Status - Status From")-1;
+const statusToIndex = headers.indexOf("Historical Status - Status To")-1;
+console.log(statusFromIndex,statusToIndex)
+  const finalData=[...filteredData].filter((item)=>{
+    const transition = `${item[statusFromIndex]} to ${item[statusToIndex]}`;
+if (validTransitions.includes(transition)) {
+  return true
+}
+  })
+console.log(finalData,'sss')
+  setCsvData([allowedHeaders,...finalData]);
 };
 
 
   const handleFileUpload = (event) => {
     setFile(event.target.files[0]);
     const file = event.target.files?.[0];
-    if (file) {
+    if (!file) return;
+
+    // Handle different file types based on extension
+    const fileExtension = file?.name?.split('.').pop().toLowerCase();
+
+    if (fileExtension === 'csv') {
       Papa.parse(file, {
         complete: (result) => {
-          calculateWorkingHours(sortData(adjustDateColumns(result.data,dateColumns)));
-      },      
+          calculateWorkingHours(sortData(adjustDateColumns(result.data, dateColumns)));
+        },
         error: (error) => {
           console.error("Error parsing CSV:", error);
         },
         skipEmptyLines: true,
       });
+    } else if (['xlsx', 'xls'].includes(fileExtension)) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const data = e.target.result;
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const excelData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+        calculateWorkingHours(sortData(adjustDateColumns(excelData, dateColumns)));
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      console.error("Unsupported file type");
     }
   };
 
@@ -287,13 +328,37 @@ const sortData = (data) => {
 };
 
 
-const parseDateTime = (dateTimeString) => {
-  const [datePart, timePart] = dateTimeString.split(" ");
-  const [day, month, year] = datePart.split("/");
-  let [hours, minutes] = timePart.split(":");
-  const date = new Date(`20${year}`, month - 1, day);
-  date.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
-  return date;
+const parseDateTime = (dateTimeString, timeStr) => {
+    try {
+        // Case 1: When date and time are passed separately (original CSV format)
+        if (timeStr !== undefined) {
+            const [day, month, year] = dateTimeString.split("/");
+            const [hours, minutes] = timeStr.split(":");
+            return new Date(`20${year}`, month - 1, day, parseInt(hours, 10), parseInt(minutes, 10), 0);
+        }
+
+        // Case 2: When it's a combined string (CSV format "DD/MM/YY HH:MM")
+        if (typeof dateTimeString === 'string' && dateTimeString.includes('/')) {
+            const [datePart, timePart] = dateTimeString.split(" ");
+            const [day, month, year] = datePart.split("/");
+            const [hours, minutes] = timePart.split(":");
+            return new Date(`20${year}`, month - 1, day, parseInt(hours, 10), parseInt(minutes, 10), 0);
+        }
+
+        // Case 3: When it's an Excel date (number or Date object)
+        if (dateTimeString instanceof Date) {
+            return dateTimeString;
+        }
+        if (typeof dateTimeString === 'number') {
+            return new Date(Math.round((dateTimeString - 25569) * 86400 * 1000));
+        }
+
+        // Fallback: Try to parse as is
+        return new Date(dateTimeString);
+    } catch (error) {
+        console.error("Error parsing date:", error, "Input:", dateTimeString, timeStr);
+        return new Date(); // Return current date as fallback
+    }
 };
 
 
@@ -369,15 +434,6 @@ const parseDateTime = (dateTimeString) => {
         "P4 - Low": 90
     };
 
-    const validTransitions = [
-      "Forwarded to Assigned",
-      "Forwarded to Work in progress",
-      "Assigned to Work in progress",
-      "Work in progress to Suspended",
-      "Work in progress to Solved",
-      "Suspended to Solved",
-      "Forwarded to Suspended"
-    ];
 
     const headers = csvData[0];
     const statusFromIndex = headers.indexOf("Historical Status - Status From");
@@ -387,110 +443,172 @@ const parseDateTime = (dateTimeString) => {
     const ticketIndex = headers.indexOf("Request - ID");
     const priorityIndex = headers.indexOf("Request - Priority Description");
     const assignedTo = headers.indexOf("Request - Resource Assigned To - Name");
+    const creationDateIndex = headers.indexOf("Historical Status - Change Date");
 
+    // Group data by request ID (removed date filtering)
     const groupedData = csvData.slice(1).reduce((acc, item) => {
         const requestId = item[requestIdIndex];
         if (!acc[requestId]) {
             acc[requestId] = [];
         }
-        const transition = `${item[statusFromIndex]} to ${item[statusToIndex]}`;
-        if (validTransitions.includes(transition)) {
+ 
             acc[requestId].push(item);
-        }
         return acc;
     }, {});
+
     const reports = Object.entries(groupedData).map(([requestId, records]) => {
         if(records?.length>0){
-          const lastRecord = records[records.length - 1];
-          const status = lastRecord?.length>0 ?lastRecord[statusToIndex]:'';
-          const priority = lastRecord[priorityIndex];
-          const slaHours = prioritySLA[priority] || 40;
+            // ... rest of the report calculation logic remains the same ...
+            const lastRecord = records[records.length - 1];
+            const status = lastRecord?.length>0 ?lastRecord[statusToIndex]:'';
+            const priority = lastRecord[priorityIndex];
+            const slaHours = prioritySLA[priority] || 40;
 
-          const elapsedTime = records.reduce((sum, record) => {
-            const timeParts = record[changeIndex].split(':'); // Split time format "H:MM"
-            
-            let timeInHours = 0;
-            if (timeParts.length === 2) {
-                const hours = parseInt(timeParts[0], 10) || 0;
-                const minutes = parseInt(timeParts[1], 10) || 0;
-                timeInHours = hours + minutes / 60; // Convert minutes into decimal hours
-            } else {
-                timeInHours = parseFloat(record[changeIndex]) || 0; // Fallback for decimal values
-            }
-        
-            return sum + timeInHours;
-        }, 0);
-        
-        // Convert total decimal hours into "H:MM h" format
-        const hours = Math.floor(elapsedTime);
-        const minutes = Math.round((elapsedTime - hours) * 60);
-        const formattedTime = `${hours}:${minutes.toString().padStart(2, '0')}`;
-        
-        // Calculate time to breach
-        const timeToBreachHours = slaHours - elapsedTime;
-        const breachHours = Math.floor(Math.abs(timeToBreachHours));
-        const breachMinutes = Math.round((Math.abs(timeToBreachHours) - breachHours) * 60);
-        const timeToBreach = timeToBreachHours >= 0 
-            ? `${breachHours}:${breachMinutes.toString().padStart(2, '0')}`
-            : `-${breachHours}:${breachMinutes.toString().padStart(2, '0')}`;
-        
-          return {
-              requestId,
-              ticket: lastRecord[ticketIndex],
-              priority,
-              status,
-              elapsedTime: formattedTime,
-              breached: elapsedTime > slaHours,
-              totalTime: slaHours,
-              assignedTo: lastRecord[assignedTo],
-              timeToBreach
-          };
+            const elapsedTime = records.reduce((sum, record) => {
+                const timeParts = record[changeIndex]?.split(':');
+                let timeInHours = 0;
+                if (timeParts?.length === 2) {
+                    const hours = parseInt(timeParts[0], 10) || 0;
+                    const minutes = parseInt(timeParts[1], 10) || 0;
+                    timeInHours = hours + minutes / 60;
+                } else {
+                    timeInHours = parseFloat(record[changeIndex]) || 0;
+                }
+                return sum + timeInHours;
+            }, 0);
+
+            const hours = Math.floor(elapsedTime);
+            const minutes = Math.round((elapsedTime - hours) * 60);
+            const formattedTime = `${hours}:${minutes.toString().padStart(2, '0')}`;
+
+            const timeToBreachHours = slaHours - elapsedTime;
+            const breachHours = Math.floor(Math.abs(timeToBreachHours));
+            const breachMinutes = Math.round((Math.abs(timeToBreachHours) - breachHours) * 60);
+            const timeToBreach = timeToBreachHours >= 0 
+                ? `${breachHours}:${breachMinutes.toString().padStart(2, '0')}`
+                : `0:00`;
+
+            return {
+                requestId,
+                ticket: lastRecord[ticketIndex],
+                priority,
+                status,
+                date:lastRecord[creationDateIndex],
+                elapsedTime: formattedTime,
+                breached: elapsedTime > slaHours,
+                totalTime: slaHours,
+                assignedTo: lastRecord[assignedTo],
+                timeToBreach
+            };
         }
-    });
-    return reports;
-  };
+    }).filter(Boolean); // Remove any undefined entries
 
-  const report = calculateReport();
+    return reports;
+};
+
+const getFilteredReport = () => {
+    if (!report) return [];
+    
+    const parseTimeToBreachValue = (timeStr) => {
+        timeStr = timeStr.replace(/\s*h\s*$/, '').trim();
+        const isNegative = timeStr.startsWith('-');
+        const hours = parseInt(timeStr.replace('-', '').split(':')[0], 10);
+        return isNegative ? -hours : hours;
+    };
+
+    return report
+        .filter(item => {
+            if (!item) return false;
+            
+            // Creation date filtering
+            if (filters.creationDateFrom || filters.creationDateTo) {
+                const creationDate = new Date(item.date.split('/').reverse().join('-'));
+                
+                if (filters.creationDateFrom) {
+                    const fromDate = new Date(filters.creationDateFrom);
+                    fromDate.setHours(0, 0, 0, 0);
+                    if (creationDate < fromDate) return false;
+                }
+
+                if (filters.creationDateTo) {
+                    const toDate = new Date(filters.creationDateTo);
+                    toDate.setHours(23, 59, 59, 999);
+                    if (creationDate > toDate) return false;
+                }
+            }
+
+            // Other filters remain the same
+            if (filters.ticket && item.requestId !== filters.ticket) return false;
+            if (filters.assignedTo && item.assignedTo !== filters.assignedTo) return false;
+            if (filters.priority && item.priority !== filters.priority) return false;
+            if (filters.breached && item.breached.toString() !== filters.breached) return false;
+            if (filters.status && item.status !== filters.status) return false;
+            
+            // Time to breach filtering
+            if (filters.timeToBreachValue) {
+                const itemHours = parseTimeToBreachValue(item.timeToBreach);
+                const filterHours = parseInt(filters.timeToBreachValue, 10);
+
+                switch (filters.timeToBreachOption) {
+                    case 'eq':
+                        if (itemHours !== filterHours) return false;
+                        break;
+                    case 'lte':
+                        if (itemHours > filterHours) return false;
+                        break;
+                    case 'gte':
+                        if (itemHours < filterHours) return false;
+                        break;
+                }
+            } 
+            return true;
+        })
+        .sort((a, b) => {
+            return parseTimeToBreachValue(a.timeToBreach) - parseTimeToBreachValue(b.timeToBreach);
+        });
+};
+
+      const parseDate = (dateStr) => {
+          if (!dateStr) return null;
+          
+          try {
+              // For DD/MM/YY format from CSV
+              if (dateStr.includes('/')) {
+                  const [day, month, year] = dateStr.split('/');
+                  const date = new Date(`20${year}`, month - 1, day);
+                  // Check if date is valid
+                  if (isNaN(date.getTime())) return null;
+                  return date;
+              }
+              
+              // For YYYY-MM-DD format from input date field
+              const date = new Date(dateStr);
+              // Check if date is valid
+              if (isNaN(date.getTime())) return null;
+              return date;
+          } catch (error) {
+              console.error('Error parsing date:', error);
+              return null;
+          }
+      };
+
+    const report = calculateReport();
 
   const getUniqueValues = (data, key) => {
     if (!data) return [];
     return [...new Set(data.filter(item => item).map(item => item[key]))];
   };
 
-  const getFilteredReport = () => {
-    if (!report) return [];
-    return report.filter(item => {
-      if (!item) return false;
-      
-      if (filters.ticket && item.requestId !== filters.ticket) return false;
-      if (filters.assignedTo && item.assignedTo !== filters.assignedTo) return false;
-      if (filters.priority && item.priority !== filters.priority) return false;
-      if (filters.allowedDuration && item.totalTime !== parseInt(filters.allowedDuration)) return false;
-      if (filters.breached && item.breached.toString() !== filters.breached) return false;
-      if (filters.status && item.status !== filters.status) return false;
-      
-      if (filters.elapsedTimeFrom || filters.elapsedTimeTo) {
-        const [hours, minutes] = item.elapsedTime.split(':');
-        const timeInHours = parseFloat(hours) + parseFloat(minutes)/60;
-        
-        if (filters.elapsedTimeFrom && timeInHours < parseFloat(filters.elapsedTimeFrom)) return false;
-        if (filters.elapsedTimeTo && timeInHours > parseFloat(filters.elapsedTimeTo)) return false;
-      }
-      
-      return true;
-    });
-  };
-
   return (
     <div className="p-2 flex flex-col gap-2 items-start">
-      <div className="card">
+      <div className="card2">
         <h1 className="heading">SLA Breach</h1>
-        <div className="upload-section">
+        <div className="upload-section2">
           <input
             type="file"
-            accept=".csv"
+            accept=".csv,.xlsx,.xls"
             onChange={handleFileUpload}
-            className="file-input"
+            className="file-input2"
           />
         </div>
         <div className="column-input-section">
@@ -531,6 +649,64 @@ const parseDateTime = (dateTimeString) => {
             <h2 className="report-heading">Report</h2>
             <div className="filters-container grid grid-cols-4 gap-4 mb-4">
               <div>
+                <label>Creation Date From:</label>
+                <input 
+                  type="date" 
+                  value={filters.creationDateFrom}
+                  onChange={(e) => setFilters({...filters, creationDateFrom: e.target.value})}
+                  className="w-full p-2 border rounded"
+                />
+              </div>
+
+              <div>
+                <label>Creation Date To:</label>
+                <input 
+                  type="date" 
+                  value={filters.creationDateTo}
+                  onChange={(e) => setFilters({...filters, creationDateTo: e.target.value})}
+                  className="w-full p-2 border rounded"
+                />
+              </div>
+
+              <div>
+                <label>Priority:</label>
+                <select 
+                  value={filters.priority} 
+                  onChange={(e) => setFilters({...filters, priority: e.target.value})}
+                  className="w-full p-2 border rounded"
+                >
+                  <option value="">All</option>
+                  {getUniqueValues(report, 'priority').map(priority => (
+                    <option key={priority} value={priority}>{priority}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex gap-2 items-end">
+                <div>
+                  <label>Time to Breach:</label>
+                  <select 
+                    value={filters.timeToBreachOption} 
+                    onChange={(e) => setFilters({...filters, timeToBreachOption: e.target.value})}
+                    className="w-full p-2 border rounded"
+                  >
+                    <option value="eq">Equal to</option>
+                    <option value="lte">Less than or equal to</option>
+                    <option value="gte">Greater than or equal to</option>
+                  </select>
+                </div>
+                <div>
+                  <input 
+                    type="number" 
+                    value={filters.timeToBreachValue}
+                    onChange={(e) => setFilters({...filters, timeToBreachValue: e.target.value})}
+                    placeholder="Enter hours"
+                    className="w-full p-2 border rounded"
+                  />
+                </div>
+              </div>
+
+              <div>
                 <label>Ticket:</label>
                 <select 
                   value={filters.ticket} 
@@ -559,57 +735,17 @@ const parseDateTime = (dateTimeString) => {
               </div>
 
               <div>
-                <label>Priority:</label>
+                <label>Status:</label>
                 <select 
-                  value={filters.priority} 
-                  onChange={(e) => setFilters({...filters, priority: e.target.value})}
+                  value={filters.status} 
+                  onChange={(e) => setFilters({...filters, status: e.target.value})}
                   className="w-full p-2 border rounded"
                 >
                   <option value="">All</option>
-                  {getUniqueValues(report, 'priority').map(priority => (
-                    <option key={priority} value={priority}>{priority}</option>
+                  {getUniqueValues(report, 'status').map(status => (
+                    <option key={status} value={status}>{status}</option>
                   ))}
                 </select>
-              </div>
-
-              <div>
-                <label>Allowed Duration:</label>
-                <select 
-                  value={filters.allowedDuration} 
-                  onChange={(e) => setFilters({...filters, allowedDuration: e.target.value})}
-                  className="w-full p-2 border rounded"
-                >
-                  <option value="">All</option>
-                  {getUniqueValues(report, 'totalTime').map(duration => (
-                    <option key={duration} value={duration}>{duration} h</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label>Elapsed Time From:</label>
-                <input 
-                  type="number" 
-                  value={filters.elapsedTimeFrom}
-                  onChange={(e) => setFilters({...filters, elapsedTimeFrom: e.target.value})}
-                  className="w-full p-2 border rounded"
-                  placeholder="Hours"
-                  min="0"
-                  step="0.5"
-                />
-              </div>
-
-              <div>
-                <label>Elapsed Time To:</label>
-                <input 
-                  type="number" 
-                  value={filters.elapsedTimeTo}
-                  onChange={(e) => setFilters({...filters, elapsedTimeTo: e.target.value})}
-                  className="w-full p-2 border rounded"
-                  placeholder="Hours"
-                  min="0"
-                  step="0.5"
-                />
               </div>
 
               <div>
@@ -624,28 +760,19 @@ const parseDateTime = (dateTimeString) => {
                   <option value="false">No</option>
                 </select>
               </div>
-
-              <div>
-                <label>Status:</label>
-                <select 
-                  value={filters.status} 
-                  onChange={(e) => setFilters({...filters, status: e.target.value})}
-                  className="w-full p-2 border rounded"
-                >
-                  <option value="">All</option>
-                  {getUniqueValues(report, 'status').map(status => (
-                    <option key={status} value={status}>{status}</option>
-                  ))}
-                </select>
-              </div>
             </div>
+            
+            {/* Add total records count */}
+            <div className="mb-4 text-sm font-medium">
+              Total Records: {getFilteredReport().length}
+            </div>
+            
             <table>
               <thead>
                 <tr>
                   <th>Ticket</th>
                   <th>Assigned To</th>
                   <th>Priority</th>
-                  <th>Allowed Duration</th>
                   <th>Elapsed Time</th>
                   <th>Time to Breach</th>
                   <th>Breached</th>
@@ -661,7 +788,6 @@ const parseDateTime = (dateTimeString) => {
                         <td>{item.requestId}</td>
                         <td>{item.assignedTo}</td>
                         <td>{item.priority}</td>
-                        <td>{item.totalTime} h</td>
                         <td>{item.elapsedTime} h</td>
                         <td>{item.timeToBreach} h</td>
                         <td>{item.breached ? "Yes" : "No"}</td>
