@@ -31,7 +31,7 @@ const Bot = () => {
       formData.append('file', selectedFile);
 
       try {
-        const response = await fetch('http://18.142.48.224:8000/api/sla_data_process', {
+        const response = await fetch('http://18.142.48.224:8000/sla_processing', {
           method: 'POST',
           body: formData,
         });
@@ -64,7 +64,7 @@ const Bot = () => {
     try {
       setIsLoading(true); // Ensure loading starts before the request
     
-      const endpoint = 'http://18.142.48.224:8000/api/sla_query_making';
+      const endpoint = 'http://18.142.48.224:8000/sla_query';
       
       const response = await fetch(endpoint, {
         method: 'POST',

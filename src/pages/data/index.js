@@ -23,8 +23,55 @@ export const MainPages = () => {
     timeToBreachOption: 'eq',
     timeToBreachValue: ''
   });
+
+  function parseDateTime(dateTimeString, timeStr) {
+    console.log(dateTimeString,'dfsd')
+    try {
+        // Case 1: When date and time are passed separately (original CSV format)
+        if (timeStr !== undefined) {
+            const [day, month, year] = dateTimeString.includes("/") 
+                ? dateTimeString.split("/") 
+                : dateTimeString.includes("-") 
+                    ? dateTimeString.split("-") 
+                    : [];
+
+            if (!day || !month || !year) throw new Error("Invalid date format");
+
+            const [hours, minutes,seconds] = timeStr.split(":");
+            return new Date(`20${year}`, month - 1, day, parseInt(hours, 10), parseInt(minutes, 10), parseInt(seconds, 10));
+        }
+
+        // Case 2: When it's a combined string (CSV format "DD/MM/YY HH:MM" or "DD-MM-YY HH:MM")
+        if (typeof dateTimeString === 'string' && (dateTimeString.includes("/") || dateTimeString.includes("-"))) {
+            const [datePart, timePart] = dateTimeString.split(" ");
+            const [day, month, year] = datePart.includes("/") 
+                ? datePart.split("/") 
+                : datePart.includes("-") 
+                    ? datePart.split("-") 
+                    : [];
+
+            if (!day || !month || !year) throw new Error("Invalid date format");
+
+            const [hours, minutes,seconds] = timePart ? timePart.split(":") : [0, 0]; // Default to midnight if no time
+            return new Date(`20${year}`, month - 1, day, parseInt(hours, 10), parseInt(minutes, 10), parseInt(seconds, 10));
+        }
+        // Case 3: When it's an Excel date (number or Date object)
+        if (dateTimeString instanceof Date) {
+            return dateTimeString;
+        }
+        if (typeof dateTimeString === 'number') {
+            return new Date(Math.round((dateTimeString - 25569) * 86400 * 1000));
+        }
+
+        // Fallback: Try to parse as is
+        return new Date(dateTimeString);
+    } catch (error) {
+        console.error("Error parsing date:", error.message);
+        return null;
+    }
+}
+
   const calculateWorkingHours = (data1) => {
-    console.log(data1)
     const addColumns = (data) => {
         // Add only Change column
         const changeIndex = data[0].length;
@@ -43,39 +90,7 @@ export const MainPages = () => {
 
     const workingHoursStart = 14; // 2 PM
     const workingHoursEnd = 23; // 11 PM
-
-    const parseDateTime = (dateTimeString, timeStr) => {
-        try {
-            // Case 1: When date and time are passed separately (original CSV format)
-            if (timeStr !== undefined) {
-                const [day, month, year] = dateTimeString.split("/");
-                const [hours, minutes] = timeStr.split(":");
-                return new Date(`20${year}`, month - 1, day, parseInt(hours, 10), parseInt(minutes, 10), 0);
-            }
-
-            // Case 2: When it's a combined string (CSV format "DD/MM/YY HH:MM")
-            if (typeof dateTimeString === 'string' && dateTimeString.includes('/')) {
-                const [datePart, timePart] = dateTimeString.split(" ");
-                const [day, month, year] = datePart.split("/");
-                const [hours, minutes] = timePart.split(":");
-                return new Date(`20${year}`, month - 1, day, parseInt(hours, 10), parseInt(minutes, 10), 0);
-            }
-
-            // Case 3: When it's an Excel date (number or Date object)
-            if (dateTimeString instanceof Date) {
-                return dateTimeString;
-            }
-            if (typeof dateTimeString === 'number') {
-                return new Date(Math.round((dateTimeString - 25569) * 86400 * 1000));
-            }
-
-            // Fallback: Try to parse as is
-            return new Date(dateTimeString);
-        } catch (error) {
-            console.error("Error parsing date:", error, "Input:", dateTimeString, timeStr);
-            return new Date(); // Return current date as fallback
-        }
-    };
+  
 
     const isWeekend = (date) => {
         const day = date.getDay();
@@ -209,7 +224,6 @@ export const MainPages = () => {
                 `${hours}:${minutes.toString().padStart(2, '0')} h`;
         }
     }
-console.log(data)
     updateTemplate(data);
 };
 
@@ -250,7 +264,7 @@ const validTransitions = [
   "Assigned to Work in progress",
   "Work in progress to Suspended",
   "Work in progress to Solved",
-  "Suspended to Solved",
+  // "Suspended to Solved",
   "Forwarded to Suspended"
 ];
 setCsvData([allowedHeaders,...filteredData]);
@@ -263,9 +277,35 @@ if (validTransitions.includes(transition)) {
   return true
 }
   })
-console.log(finalData,'sss')
   setCsvData2([allowedHeaders,...finalData]);
 };
+
+
+
+function adjustDateColumns2(excelData) {
+  return excelData.map((row) => {
+    return row.map((cell, index) => {
+      if ([0, 7]?.includes(index) && !isNaN(cell)) {
+        // Convert Excel serial number to JavaScript Date
+        const jsDate = new Date((cell - 25569) * 86400000);
+
+        // Extract day, month, and year
+        const dateString = jsDate.toLocaleDateString("en-GB"); // Format as DD/MM/YYYY
+
+        const [day, month, year] = dateString.includes("/")
+          ? dateString.split("/")
+          : dateString.includes("-")
+          ? dateString.split("-")
+          : [];
+
+        return `${day}/${month}/${year}`; // Return formatted date
+      }
+      return cell;
+    });
+  });
+}
+
+
 
 
   const handleFileUpload = (event) => {
@@ -280,6 +320,7 @@ console.log(finalData,'sss')
       Papa.parse(file, {
         complete: (result) => {
           calculateWorkingHours(sortData(adjustDateColumns(result.data, dateColumns)));
+           
         },
         error: (error) => {
           console.error("Error parsing CSV:", error);
@@ -293,11 +334,16 @@ console.log(finalData,'sss')
         const workbook = XLSX.read(data, { type: 'array' });
         const firstSheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[firstSheetName];
-        const excelData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-        calculateWorkingHours(sortData(adjustDateColumns(excelData, dateColumns)));
+        let excelData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+    
+        // Remove empty rows
+        excelData = excelData.filter(row => row.some(cell => cell !== undefined && cell !== null && cell !== ''));
+    
+        calculateWorkingHours(sortData(adjustDateColumns(adjustDateColumns2(excelData), dateColumns)));
       };
       reader.readAsArrayBuffer(file);
-    } else {
+    }
+     else {
       console.error("Unsupported file type");
     }
   };
@@ -327,39 +373,6 @@ const sortData = (data) => {
     return sortedData;
 };
 
-
-const parseDateTime = (dateTimeString, timeStr) => {
-    try {
-        // Case 1: When date and time are passed separately (original CSV format)
-        if (timeStr !== undefined) {
-            const [day, month, year] = dateTimeString.split("/");
-            const [hours, minutes] = timeStr.split(":");
-            return new Date(`20${year}`, month - 1, day, parseInt(hours, 10), parseInt(minutes, 10), 0);
-        }
-
-        // Case 2: When it's a combined string (CSV format "DD/MM/YY HH:MM")
-        if (typeof dateTimeString === 'string' && dateTimeString.includes('/')) {
-            const [datePart, timePart] = dateTimeString.split(" ");
-            const [day, month, year] = datePart.split("/");
-            const [hours, minutes] = timePart.split(":");
-            return new Date(`20${year}`, month - 1, day, parseInt(hours, 10), parseInt(minutes, 10), 0);
-        }
-
-        // Case 3: When it's an Excel date (number or Date object)
-        if (dateTimeString instanceof Date) {
-            return dateTimeString;
-        }
-        if (typeof dateTimeString === 'number') {
-            return new Date(Math.round((dateTimeString - 25569) * 86400 * 1000));
-        }
-
-        // Fallback: Try to parse as is
-        return new Date(dateTimeString);
-    } catch (error) {
-        console.error("Error parsing date:", error, "Input:", dateTimeString, timeStr);
-        return new Date(); // Return current date as fallback
-    }
-};
 
 
 
@@ -443,7 +456,8 @@ const parseDateTime = (dateTimeString, timeStr) => {
     const ticketIndex = headers.indexOf("Request - ID");
     const priorityIndex = headers.indexOf("Request - Priority Description");
     const assignedTo = headers.indexOf("Request - Resource Assigned To - Name");
-    const creationDateIndex = headers.indexOf("Historical Status - Change Date");
+    const creationDateIndex = headers.indexOf("Req. Creation Date");
+    const endDateIndex = headers.indexOf("Historical Status - Change Date");
 
     // Group data by request ID (removed date filtering)
     const groupedData = csvData2.slice(1).reduce((acc, item) => {
@@ -461,7 +475,7 @@ const parseDateTime = (dateTimeString, timeStr) => {
             // ... rest of the report calculation logic remains the same ...
             const lastRecord = records[records.length - 1];
             const status = lastRecord?.length>0 ?lastRecord[statusToIndex]:'';
-            const priority = lastRecord[priorityIndex];
+            const priority = `${lastRecord[priorityIndex]}`;
             const slaHours = prioritySLA[priority] || 40;
 
             const elapsedTime = records.reduce((sum, record) => {
@@ -491,9 +505,10 @@ const parseDateTime = (dateTimeString, timeStr) => {
             return {
                 requestId,
                 ticket: lastRecord[ticketIndex],
-                priority,
+                priority:`${priority}(${slaHours})`,
                 status,
                 date:lastRecord[creationDateIndex],
+                endDate:lastRecord[endDateIndex],
                 elapsedTime: formattedTime,
                 breached: elapsedTime > slaHours,
                 totalTime: slaHours,
@@ -771,6 +786,8 @@ const getFilteredReport = () => {
               <thead>
                 <tr>
                   <th>Ticket</th>
+                  <th>Start Date</th>
+                  <th>End Date</th>
                   <th>Assigned To</th>
                   <th>Priority</th>
                   <th>Elapsed Time</th>
@@ -786,6 +803,8 @@ const getFilteredReport = () => {
                      {item &&
                       <tr key={index}>
                         <td>{item.requestId}</td>
+                        <td>{item.date}</td>
+                        <td>{item.endDate}</td>
                         <td>{item.assignedTo}</td>
                         <td>{item.priority}</td>
                         <td>{item.elapsedTime} h</td>
