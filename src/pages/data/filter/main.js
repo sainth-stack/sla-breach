@@ -1,0 +1,188 @@
+import React, { useState, useMemo } from 'react';
+import TableReport from '../table-report/index';
+import PiechartReport from '../piechart/piechart-report';
+import '../piechart/PiechartReport.css';
+import '../table-report/TableReport.css'
+const ReportViewer = ({ rawData,yearMonth,headerIndices }) => {
+  const [activeView, setActiveView] = useState('table');
+  const [filters, setFilters] = useState({
+    creationDateFrom: null,
+    creationDateTo: null,
+    priority: '',
+    assignedTo: '',
+    status: '',
+    breached: '',
+    searchText: ''
+  });
+
+  // Constants for column indexes
+  const COLUMNS = {
+    RESP_SLA:22,
+    CREATION_DATE: 0,
+    TICKET_ID: 3,
+    PRIORITY: 4,
+    STATUS_FROM: 5,
+    STATUS_TO: 6,
+    STATUS_CHANGE_DATE: 7,
+    ASSIGNED_TO: 13,
+    CURRENT_STATUS: 15,
+    BREACHED: 20,
+    RESP_SLA: 22,
+    ELAPSED_TIME: 32,
+    RESP_REM: 35,
+    // MACRO_AREA: rawData[0].indexOf("Macro Area - Name"),
+    REQ_STATUS: rawData[0].indexOf("Req. Status - Description"),
+    RESOLUTION_DATE: rawData[0].indexOf("Req. Resolution Date")
+  };
+
+  const processedData = useMemo(() => {
+    if (!rawData || rawData.length < 2) return [];
+  
+    const headers = rawData[0];
+    const rows = rawData.slice(1);
+    const ticketGroups = {};
+  
+    rows.forEach(row => {
+      const ticketId = row[COLUMNS.TICKET_ID];
+      
+      if (!ticketGroups[ticketId]) {
+        ticketGroups[ticketId] = [];
+      }
+      ticketGroups[ticketId].push(row);
+    });
+  
+    return Object.values(ticketGroups).map(ticketRows => {
+      const lastRow = ticketRows[ticketRows.length - 1];
+      
+      return {
+        ticketId: lastRow[COLUMNS.TICKET_ID],
+        creationDate: lastRow[COLUMNS.CREATION_DATE],
+        priority: lastRow[COLUMNS.PRIORITY],
+        assignedTo: lastRow[COLUMNS.ASSIGNED_TO],
+        currentStatus: lastRow[COLUMNS.CURRENT_STATUS],
+        elapsedTime: lastRow[COLUMNS.ELAPSED_TIME],
+        isBreached: (lastRow[headerIndices.rollover] === yearMonth &&  lastRow[headerIndices.resolRem] <0 &&  lastRow[headerIndices.reqComp] =="End"),
+        status: lastRow[COLUMNS.REQ_STATUS],
+        resolutionDate: lastRow[COLUMNS.RESOLUTION_DATE],
+        statusChanges: ticketRows.map(row => ({
+          from: row[COLUMNS.STATUS_FROM],
+          to: row[COLUMNS.STATUS_TO],
+          date: row[COLUMNS.STATUS_CHANGE_DATE]
+        }))
+      };
+    });
+  }, [rawData]);
+
+  // Filter data based on filters
+  const filteredData = useMemo(() => {
+    return processedData.filter((ticket) => {
+      // Creation date filter
+      function parseDDMMYYYY(dateStr) {
+        const [day, month, year] = dateStr.split('/');
+        return new Date(year, month - 1, day);
+      }
+      
+      if (filters.creationDateFrom) {
+        const ticketDate = parseDDMMYYYY(ticket.creationDate);
+        if (ticketDate < filters.creationDateFrom) return false;
+      }
+      if (filters.creationDateTo) {
+        const ticketDate = parseDDMMYYYY(ticket.creationDate);
+        if (ticketDate > filters.creationDateTo) return false;
+      }
+
+      // Priority filter
+      if (filters.priority && ticket.priority !== filters.priority) return false;
+
+      // Assigned to filter
+      if (filters.assignedTo && ticket.assignedTo !== filters.assignedTo) return false;
+
+      // Status filter
+      if (filters.status && ticket.currentStatus !== filters.status) return false;
+
+      // Breached filter
+      if (filters.breached !== '') {
+        const filterBreached = filters.breached === 'true';
+        if (ticket.isBreached !== filterBreached) return false;
+      }
+
+      // Search text filter
+      if (filters.searchText) {
+        const searchLower = filters.searchText.toLowerCase();
+        const ticketText = Object.values(ticket).join(' ').toLowerCase();
+        if (!ticketText.includes(searchLower)) return false;
+      }
+
+      return true;
+    });
+  }, [processedData, filters]);
+
+  // Get unique values for filter dropdowns
+  const getUniqueValues = (property) => {
+    const values = new Set();
+    processedData.forEach(ticket => {
+      if (ticket[property]) values.add(ticket[property]);
+    });
+    return Array.from(values).sort();
+  };
+
+  // Handle filter changes
+  const handleFilterChange = (filterName, value) => {
+    setFilters(prev => ({
+      ...prev,
+      [filterName]: value
+    }));
+  };
+
+  // Reset all filters
+  const resetFilters = () => {
+    setFilters({
+      creationDateFrom: null,
+      creationDateTo: null,
+      priority: '',
+      assignedTo: '',
+      status: '',
+      breached: '',
+      searchText: ''
+    });
+  };
+
+  return (
+    <div className="combined-report-container">
+      <div className="view-switcher">
+        <button
+          className={`view-button ${activeView === 'table' ? 'active' : ''}`}
+          onClick={() => setActiveView('table')}
+        >
+          Table View
+        </button>
+        <button
+          className={`view-button ${activeView === 'charts' ? 'active' : ''}`}
+          onClick={() => setActiveView('charts')}
+        >
+          Analytics View
+        </button>
+      </div>
+
+      {activeView === 'table' ? (
+        <TableReport 
+          data={filteredData}
+          filters={filters}
+          onFilterChange={handleFilterChange}
+          onResetFilters={resetFilters}
+          getUniqueValues={getUniqueValues}
+        />
+      ) : (
+        <PiechartReport 
+          data={filteredData}
+          filters={filters}
+          onFilterChange={handleFilterChange}
+          onResetFilters={resetFilters}
+          getUniqueValues={getUniqueValues}
+        />
+      )}
+    </div>
+  );
+};
+
+export default ReportViewer;
