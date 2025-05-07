@@ -3,7 +3,8 @@ import TableReport from '../table-report/index';
 import PiechartReport from '../piechart/piechart-report';
 import '../piechart/PiechartReport.css';
 import '../table-report/TableReport.css'
-const ReportViewer = ({ rawData,yearMonth,headerIndices }) => {
+
+const ReportViewer = ({ rawData, yearMonth, headerIndices }) => {
   const [activeView, setActiveView] = useState('table');
   const [filters, setFilters] = useState({
     creationDateFrom: null,
@@ -12,12 +13,14 @@ const ReportViewer = ({ rawData,yearMonth,headerIndices }) => {
     assignedTo: '',
     status: '',
     breached: '',
-    searchText: ''
+    searchText: '',
+    timeToBreachOption: 'eq',
+    timeToBreachValue: ''
   });
 
   // Constants for column indexes
   const COLUMNS = {
-    RESP_SLA:22,
+    RESP_SLA: 22,
     CREATION_DATE: 0,
     TICKET_ID: 3,
     PRIORITY: 4,
@@ -29,8 +32,8 @@ const ReportViewer = ({ rawData,yearMonth,headerIndices }) => {
     BREACHED: 20,
     RESP_SLA: 22,
     ELAPSED_TIME: 32,
+    resolSW: 33,
     RESP_REM: 35,
-    // MACRO_AREA: rawData[0].indexOf("Macro Area - Name"),
     REQ_STATUS: rawData[0].indexOf("Req. Status - Description"),
     RESOLUTION_DATE: rawData[0].indexOf("Req. Resolution Date")
   };
@@ -61,9 +64,13 @@ const ReportViewer = ({ rawData,yearMonth,headerIndices }) => {
         assignedTo: lastRow[COLUMNS.ASSIGNED_TO],
         currentStatus: lastRow[COLUMNS.CURRENT_STATUS],
         elapsedTime: lastRow[COLUMNS.ELAPSED_TIME],
-        isBreached: (lastRow[headerIndices.rollover] === yearMonth &&  lastRow[headerIndices.resolRem] <0 &&  lastRow[headerIndices.reqComp] =="End"),
+        isBreached: (lastRow[headerIndices.rollover] === yearMonth && 
+                    lastRow[headerIndices.resolRem] < 0 && 
+                    lastRow[headerIndices.reqComp] === "End"),
         status: lastRow[COLUMNS.REQ_STATUS],
         resolutionDate: lastRow[COLUMNS.RESOLUTION_DATE],
+        timeToBreach: lastRow[COLUMNS.RESP_REM],
+        totalTime:lastRow[COLUMNS.resolSW],
         statusChanges: ticketRows.map(row => ({
           from: row[COLUMNS.STATUS_FROM],
           to: row[COLUMNS.STATUS_TO],
@@ -106,6 +113,26 @@ const ReportViewer = ({ rawData,yearMonth,headerIndices }) => {
         if (ticket.isBreached !== filterBreached) return false;
       }
 
+      // Time to Breach filter
+      if (filters.timeToBreachValue) {
+        const ticketHours = parseFloat(ticket.timeToBreach);
+        const filterHours = parseFloat(filters.timeToBreachValue);
+
+        if (!isNaN(ticketHours) && !isNaN(filterHours)) {
+          switch (filters.timeToBreachOption) {
+            case 'eq':
+              if (ticketHours !== filterHours) return false;
+              break;
+            case 'lte':
+              if (ticketHours > filterHours) return false;
+              break;
+            case 'gte':
+              if (ticketHours < filterHours) return false;
+              break;
+          }
+        }
+      }
+
       // Search text filter
       if (filters.searchText) {
         const searchLower = filters.searchText.toLowerCase();
@@ -143,7 +170,9 @@ const ReportViewer = ({ rawData,yearMonth,headerIndices }) => {
       assignedTo: '',
       status: '',
       breached: '',
-      searchText: ''
+      searchText: '',
+      timeToBreachOption: 'eq',
+      timeToBreachValue: ''
     });
   };
 

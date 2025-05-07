@@ -5,14 +5,16 @@ const TableReport = ({ data, filters, onFilterChange, onResetFilters, getUniqueV
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
-
+console.log(data)
   const columns = [
     { key: 'ticketId', name: 'Ticket ID' },
     { key: 'creationDate', name: 'Creation Date' },
     { key: 'priority', name: 'Priority' },
     { key: 'assignedTo', name: 'Assigned To' },
     { key: 'currentStatus', name: 'Current Status' },
+    { key: 'totalTime', name: 'Response Time' },
     { key: 'elapsedTime', name: 'Elapsed Time (h)' },
+    { key: 'totalTime', name: 'Remaining Time' },
     { key: 'isBreached', name: 'Breached' }
   ];
 
@@ -81,7 +83,7 @@ const TableReport = ({ data, filters, onFilterChange, onResetFilters, getUniqueV
 
       {/* Summary Info */}
       <div className="flex justify-between items-center p-4 bg-gray-50 border-b">
-        <div className="text-sm text-gray-600">
+        <div className="text-sm text-gray-600" style={{fontWeight:600}}>
           Showing {data.length} records
         </div>
         <div className="text-sm font-medium text-gray-700">
@@ -126,7 +128,13 @@ const TableReport = ({ data, filters, onFilterChange, onResetFilters, getUniqueV
                     {ticket.currentStatus}
                   </span>
                 </td>
+                <td>
+                  <span className={``}>
+                    {ticket.totalTime}
+                  </span>
+                </td>
                 <td>{ticket.elapsedTime}</td>
+                <td>{ticket.timeToBreach}</td>
                 <td>
                   <span className={`badge ${getBadgeClass(ticket.isBreached)}`}>
                     {ticket.isBreached ? 'Yes' : 'No'}

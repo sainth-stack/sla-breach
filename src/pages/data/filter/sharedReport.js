@@ -11,28 +11,10 @@ const SharedFilters = ({
 }) => {
   return (
     <div className="filter-section">
-      <div className="flex justify-between items-center mb-4">
-        <div className="w-full max-w-md">
-          <label className="filter-label">Search</label>
-          <input
-            type="text"
-            placeholder="Search across all columns..."
-            className="filter-input"
-            value={filters.searchText}
-            onChange={(e) => onFilterChange('searchText', e.target.value)}
-          />
-        </div>
-        <button
-          onClick={onResetFilters}
-          className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors ml-4"
-        >
-          Reset Filters
-        </button>
-      </div>
+
 
       <div className="filter-grid">
-        {/* Creation Date From */}
-        <div className="filter-group">
+        {/* <div className="filter-group">
           <label className="filter-label">Creation Date From</label>
           <DatePicker
             selected={filters.creationDateFrom}
@@ -42,7 +24,6 @@ const SharedFilters = ({
           />
         </div>
 
-        {/* Creation Date To */}
         <div className="filter-group">
           <label className="filter-label">Creation Date To</label>
           <DatePicker
@@ -51,7 +32,7 @@ const SharedFilters = ({
             className="filter-input"
             placeholderText="Select end date"
           />
-        </div>
+        </div> */}
 
         {/* Priority */}
         <div className="filter-group">
@@ -117,6 +98,54 @@ const SharedFilters = ({
             classNamePrefix="select"
           />
         </div>
+
+        {/* Time to Breach */}
+        <div className="filter-group">
+          <label className="filter-label">Time to Breach</label>
+          <div className="flex gap-2">
+            <Select
+              options={[
+                { value: 'eq', label: 'Equal to' },
+                { value: 'lte', label: 'Less than or equal to' },
+                { value: 'gte', label: 'Greater than or equal to' }
+              ]}
+              value={{
+                value: filters.timeToBreachOption,
+                label: filters.timeToBreachOption === 'eq' ? 'Equal to' :
+                      filters.timeToBreachOption === 'lte' ? 'Less than or equal to' :
+                      'Greater than or equal to'
+              }}
+              onChange={(option) => onFilterChange('timeToBreachOption', option.value)}
+              className="basic-select flex-1"
+              classNamePrefix="select"
+            />
+            <input
+              type="number"
+              placeholder="Hours"
+              className="filter-input flex-1"
+              value={filters.timeToBreachValue || ''}
+              onChange={(e) => onFilterChange('timeToBreachValue', e.target.value)}
+            />
+          </div>
+        </div>
+      </div>
+      <div className="flex justify-between items-center mt-4">
+        <div className="w-full max-w-md">
+          <label className="filter-label">Search</label>
+          <input
+            type="text"
+            placeholder="Search across all columns..."
+            className="filter-input"
+            value={filters.searchText}
+            onChange={(e) => onFilterChange('searchText', e.target.value)}
+          />
+        </div>
+        <button
+          onClick={onResetFilters}
+          className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors ml-4"
+        >
+          Reset Filters
+        </button>
       </div>
     </div>
   );
