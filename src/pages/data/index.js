@@ -25,22 +25,37 @@ const YELLOW_FIELDS = [
   "ReqCrYM",
 ];
 
-const HOLIDAYS = [
-  "2024-01-01",
-  "2024-01-14",
-  "2024-01-26",
-  "2024-03-29",
-  "2024-04-21",
-  "2024-04-02",
-  "2024-04-13",
-  "2024-04-14",
-  "2024-06-02",
-  "2024-08-15",
-  "2024-09-10",
-  "2024-10-02",
-  "2024-10-31",
-  "2024-12-25",
-];
+// Holiday data for multiple years (2021-2025)
+const HOLIDAYS_BY_YEAR = {
+  "2024": [
+    "2024-01-01",
+    "2024-01-14",
+    "2024-01-26",
+    "2024-03-29",
+    "2024-04-02",
+    "2024-04-13",
+    "2024-04-14",
+    "2024-04-21",
+    "2024-06-02",
+    "2024-08-15",
+    "2024-09-10",
+    "2024-10-02",
+    "2024-10-31",
+    "2024-12-25"
+  ],
+  "2025": [
+    "2025-01-01",
+    "2025-01-14",
+    "2025-02-27",
+    "2025-03-31",
+    "2025-05-01",
+    "2025-08-15",
+    "2025-08-27",
+    "2025-10-02",
+    "2025-10-21",
+    "2025-12-25"
+  ]
+};
 
 const SLA_TABLE = {
   P1: { respsow: 0.5, resolsow: 4 },
@@ -53,7 +68,6 @@ const WORK_HOURS = {
   start: "14:00:00",
   end: "23:00:00",
 };
-
 
 const dateUtils = {
   excelSerialToDate: (serial) => {
@@ -78,8 +92,7 @@ const dateUtils = {
     ).padStart(2, "0")}/${date.getFullYear()}`;
   },
 
-  parseDateTime: (dateVal, timeStr,index) => {
-
+  parseDateTime: (dateVal, timeStr, index) => {
     try {
       let date;
       if (typeof dateVal === "number") {
@@ -111,16 +124,6 @@ const dateUtils = {
     }
     return dateUtils.formatDate(excelDate);
   },
-};
-
-const holidayTimestamps = HOLIDAYS?.map((h) =>
-  new Date(h).setHours(0, 0, 0, 0)
-);
-
-const isWorkingDay = (date) => {
-  const day = date.getDay();
-  const dateTimestamp = new Date(date).setHours(0, 0, 0, 0);
-  return day !== 0 && day !== 6 && !holidayTimestamps.includes(dateTimestamp);
 };
 
 const calculationUtils = {
@@ -183,18 +186,18 @@ const calculationUtils = {
     const getMedTime = (date) => {
       const hours = date.getHours() + date.getMinutes() / 60;
 
-      if (!isWorkingDay(date)) {
+      if (!isWorkingDay(date, holidays)) {
         return workDayEnd;
       }
 
       return Math.max(workDayStart, Math.min(hours, workDayEnd));
     };
 
-    const startMedTime = isWorkingDay(startDate)
+    const startMedTime = isWorkingDay(startDate, holidays)
       ? getMedTime(startDate)
       : workDayStart;
 
-    const endMedTime = isWorkingDay(endDate) ? getMedTime(endDate) : workDayEnd;
+    const endMedTime = isWorkingDay(endDate, holidays) ? getMedTime(endDate) : workDayEnd;
 
     const fullDaysPart = (networkDays - 1) * workDayLength;
 
@@ -249,7 +252,11 @@ const calculationUtils = {
       endDate,
       holidays
     );
-
+if(index==3){
+  console.log(networkDays,  adjustedStartDate,
+    endDate,
+    holidays,'networkDays')
+}
     if (networkDays === 0) return 0;
 
     const getMedTime = (date) => {
@@ -278,6 +285,7 @@ const calculationUtils = {
     return result;
   },
 };
+
 function parseCustomDate(dateString) {
   const [datePart, timePart] = dateString.split(' ');
   const [month, day, year] = datePart.split('/');
@@ -288,10 +296,46 @@ function parseCustomDate(dateString) {
   );
 }
 
+function convertToISODate(dateStr) {
+  if (!dateStr) return '';
+  
+  const [day, month, year] = dateStr.split('/');
+  
+  // Validate date components
+  if (!day || !month || !year || day.length !== 2 || month.length !== 2 || year.length !== 4) {
+    console.error('Invalid date format. Expected DD/MM/YYYY');
+    return '';
+  }
+
+  return `${year}-${month}-${day}`;
+}
+
+
+const isWorkingDay = (date, holidays) => {
+  const day = date.getDay();
+  const dateTimestamp = new Date(date).setHours(0, 0, 0, 0);
+  const holidayTimestamps = holidays.map(h => new Date(h).setHours(0, 0, 0, 0));
+  return day !== 0 && day !== 6 && !holidayTimestamps.includes(dateTimestamp);
+};
+
 export const MainPages = () => {
   const [csvData, setCsvData] = useState(null);
   const [file, setFile] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [holidays, setHolidays] = useState([]);
+
+  const getHolidaysForYears = (years) => {
+    const uniqueYears = [...new Set(years)];
+    const allHolidays = [];
+    
+    uniqueYears.forEach(year => {
+      if (HOLIDAYS_BY_YEAR[year]) {
+        allHolidays.push(...HOLIDAYS_BY_YEAR[year]);
+      }
+    });
+    console.log(allHolidays,'all holidays')
+    return allHolidays;
+  };
 
   const processExcelData = (data) => {
     console.log(data,'sdfijsn')
@@ -345,7 +389,7 @@ export const MainPages = () => {
     const sortedRows = sortDataByRequestId(headers, rows);
 
     return { headers, rows: sortedRows };
-};
+  };
 
   const sortDataByRequestId = (headers, rows) => {
     const requestIdIndex = headers.indexOf("Request - ID");
@@ -378,7 +422,7 @@ export const MainPages = () => {
 
     // Flatten the grouped data back into an array
     return Object.values(groupedData).flat();
-};
+  };
 
   const handleFileUpload = (event) => {
     const selectedFile = event.target.files?.[0];
@@ -414,7 +458,6 @@ export const MainPages = () => {
           header: 1,
           defval: "",
         });
-        console.log(excelData,'sdfijsdni')
         processData(excelData);
         setIsProcessing(false);
       };
@@ -428,6 +471,34 @@ export const MainPages = () => {
   const processData = (data) => {
     if (!data || data.length === 0) return;
     const { headers, rows } = processExcelData(data);
+    
+    // Extract years from the data to determine which holidays to use
+    const years = [];
+    const reqCreationDateIndex = headers.indexOf("Req. Creation Date");
+    const historicalChangeDateIndex = headers.indexOf("Historical Status - Change Date");
+    
+    rows.forEach(row => {
+      // Extract year from creation date
+      if (reqCreationDateIndex !== -1 && row[reqCreationDateIndex]) {
+        const dateParts = row[reqCreationDateIndex].split('/');
+        if (dateParts.length === 3) {
+          years.push(dateParts[2]);
+        }
+      }
+      
+      // Extract year from change date
+      if (historicalChangeDateIndex !== -1 && row[historicalChangeDateIndex]) {
+        const dateParts = row[historicalChangeDateIndex].split('/');
+        if (dateParts.length === 3) {
+          years.push(dateParts[2]);
+        }
+      }
+    });
+    
+    // Get holidays for all years present in the data
+    const relevantHolidays = getHolidaysForYears(years);
+    setHolidays(relevantHolidays);
+
     const headerIndices = {
       reqCreationDate: headers.indexOf("Req. Creation Date"),
       creationTime: headers.indexOf("Creation Time"),
@@ -439,6 +510,7 @@ export const MainPages = () => {
       historicalChangeTime: headers.indexOf("Historical Status - Change Time"),
       priorityDescription: headers.indexOf("Request - Priority Description"),
       reqClosingDate: headers.indexOf("Req. Closing Date"),
+      reqTypeDescription: headers.indexOf("Req. Type - Description EN"),
     };
 
     YELLOW_FIELDS.forEach((field) => {
@@ -472,6 +544,9 @@ export const MainPages = () => {
       const reqStatusDescription = (
         newRow[headerIndices.reqStatusDescription] || ""
       )
+      const reqTypeDescription = (
+        newRow[headerIndices.reqTypeDescription] || ""
+      )
         .toString()
         .trim();
 
@@ -479,7 +554,7 @@ export const MainPages = () => {
         creationDateVal,
         creationTime
       );
-      const changeDateTime = dateUtils.parseDateTime(changeDateVal, changeTime,index);
+      const changeDateTime = dateUtils.parseDateTime(changeDateVal, changeTime, index);
 
       const creationDate = creationDateTime ? new Date(creationDateTime) : null;
       const changeDate = changeDateTime ? new Date(changeDateTime) : null;
@@ -559,7 +634,8 @@ export const MainPages = () => {
           endDate,
           WORK_HOURS.start,
           WORK_HOURS.end,
-          HOLIDAYS
+          (holidays.length > 0 ? holidays : relevantHolidays),
+          index
         );
 
         newRow[headerIndices.calcstdt] = workingHours.toFixed(2);
@@ -568,10 +644,12 @@ export const MainPages = () => {
       }
 
       newRow[headerIndices.refinedstdt] =
-        parseFloat(newRow[headerIndices.calcstdt] || 0) < 0
-          ? "0"
-          : newRow[headerIndices.calcstdt];
-
+      parseFloat(newRow[headerIndices.calcstdt] || 0) < 0 ||
+      (newRow[headerIndices.reqTypeDescription] || "").toString().trim() === "Service Request" ||
+      holidays.includes(convertToISODate(newRow[headerIndices.historicalChangeDate])) // Column D
+        ? "0"
+        : newRow[headerIndices.calcstdt];
+        
       if (
         newRow[headerIndices.respsla] !== "Yes" &&
         requestId === prevRequestId &&
@@ -588,19 +666,27 @@ export const MainPages = () => {
           endDate,
           WORK_HOURS.start,
           WORK_HOURS.end,
-          HOLIDAYS,
+          (holidays.length > 0 ? holidays : relevantHolidays),
           index
         );
 
         newRow[headerIndices.calcpredt] = workingHours.toFixed(2);
+        if(requestId=="A2266513L"){
+          console.log(workingHours,holidays,relevantHolidays,'fsjkfjnds')
+        }
       } else {
         newRow[headerIndices.calcpredt] = "0.00";
       }
 
-      newRow[headerIndices.refinedpredt] =
-        parseFloat(newRow[headerIndices.calcpredt] || 0) < 0
-          ? "0"
-          : newRow[headerIndices.calcpredt];
+
+
+
+newRow[headerIndices.refinedpredt] =
+  parseFloat(newRow[headerIndices.calcpredt] || 0) < 0 ||
+  (newRow[headerIndices.reqTypeDescription] || "").toString().trim() === "Service Request" ||
+  holidays.includes(convertToISODate(newRow[headerIndices.historicalChangeDate]))
+    ? "0"
+    : newRow[headerIndices.calcpredt];
 
       newRow[headerIndices.elapsedtime] = (
         newRow[headerIndices.resolsla] === "Yes" &&
@@ -689,6 +775,9 @@ export const MainPages = () => {
           : "9999 12";
 
       lastProcessedRow = newRow;
+      if(requestId=="A2266513L"){
+        console.log(newRow,'fsjkfjnds')
+      }
       return newRow;
     });
 
@@ -714,8 +803,6 @@ export const MainPages = () => {
       if (HIGHLIGHT_FIELDS.includes(header)) acc[idx] = true;
       return acc;
     }, {});
-  console.log(highlightCols,'dfsjni')
-  console.log(Object.keys(ws))
     // Apply styles
     Object.keys(ws).forEach(key => {
       if (key !== '!ref') {
@@ -746,12 +833,6 @@ export const MainPages = () => {
         </h1>
 
         <div className="mb-8">
-          {/* <label
-            htmlFor="file-upload"
-            className="block text-sm font-medium text-gray-700 mb-2"
-          >
-            Upload CSV or Excel File
-          </label> */}
           <div className="flex items-center gap-4">
             <input
               id="file-upload"
@@ -800,10 +881,7 @@ export const MainPages = () => {
               </button>
             )}
 
-{csvData &&<div className="flex justify-between items-center">
-              {/* <h2 className="text-lg font-semibold text-gray-800">
-                Processed Data Preview (First 100 Records)
-              </h2> */}
+             {csvData &&<div className="flex justify-between items-center">
               <button
                 onClick={handleDownload}
                 className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors duration-200 font-semibold"
@@ -816,48 +894,6 @@ export const MainPages = () => {
 
         {csvData && (
           <div className="space-y-6">
- 
-
-            {/* <div className="overflow-x-auto border rounded-lg">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    {csvData[0].map((header, index) => (
-                      <th
-                        key={index}
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                      >
-                        {header}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {csvData.slice(1, 101).map((row, rowIndex) => (
-                    <tr
-                      key={rowIndex}
-                      className="hover:bg-gray-50 transition-colors duration-100"
-                    >
-                      {row.map((cell, cellIndex) => (
-                        <td
-                          key={cellIndex}
-                          className="px-6 py-4 whitespace-nowrap text-sm text-gray-600"
-                          style={{
-                            backgroundColor: YELLOW_FIELDS.includes(
-                              csvData[0][cellIndex]
-                            )
-                              ? "#fef9c3"
-                              : "transparent",
-                          }}
-                        >
-                          {cell}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div> */}
           </div>
         )}
               <div>

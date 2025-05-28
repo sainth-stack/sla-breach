@@ -97,13 +97,12 @@ const [finalData,setFinalData]=useState([])
       responseSLAPercentage
     });
   };
-  console.log(data,finalData)
   const handleYearMonthChange = (e) => {
     setYearMonth(e.target.value);
   };
   if (!headerIndices) return <div>Loading report...</div>;
   return (
-    <div className="max-w-6xl mx-auto p-6 bg-white rounded-lg shadow-md" style={{marginTop:'30px'}}>
+    <div className="mx-auto p-6 bg-white rounded-lg shadow-md" style={{marginTop:'30px'}}>
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-800 mb-2">
           Report for the month of:
@@ -116,7 +115,6 @@ const [finalData,setFinalData]=useState([])
           className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       </div>
-
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-blue-50 p-6 rounded-lg">
           <h2 className="text-xl font-semibold text-blue-800 mb-4">Ticket Overview</h2>

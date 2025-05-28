@@ -9,10 +9,11 @@ const ReportViewer = ({ rawData, yearMonth, headerIndices }) => {
   const [filters, setFilters] = useState({
     creationDateFrom: null,
     creationDateTo: null,
-    priority: '',
-    assignedTo: '',
-    status: '',
-    breached: '',
+    priority: [], // Changed to array
+    assignedTo: [], // Already array
+    status: [], // Changed to array
+    breached: [], // Changed to array
+    marconaName: [], // Changed to array
     searchText: '',
     timeToBreachOption: 'eq',
     timeToBreachValue: ''
@@ -34,6 +35,7 @@ const ReportViewer = ({ rawData, yearMonth, headerIndices }) => {
     ELAPSED_TIME: 32,
     resolSW: 33,
     RESP_REM: 35,
+    MARCO:9,
     REQ_STATUS: rawData[0].indexOf("Req. Status - Description"),
     RESOLUTION_DATE: rawData[0].indexOf("Req. Resolution Date")
   };
@@ -62,11 +64,10 @@ const ReportViewer = ({ rawData, yearMonth, headerIndices }) => {
         creationDate: lastRow[COLUMNS.CREATION_DATE],
         priority: lastRow[COLUMNS.PRIORITY],
         assignedTo: lastRow[COLUMNS.ASSIGNED_TO],
+        marconaName: lastRow[COLUMNS.MARCO],
         currentStatus: lastRow[COLUMNS.CURRENT_STATUS],
         elapsedTime: lastRow[COLUMNS.ELAPSED_TIME],
-        isBreached: (lastRow[headerIndices.rollover] === yearMonth && 
-                    lastRow[headerIndices.resolRem] < 0 && 
-                    lastRow[headerIndices.reqComp] === "End"),
+        isBreached:lastRow[COLUMNS.RESP_REM] >0 ? false : true,
         status: lastRow[COLUMNS.REQ_STATUS],
         resolutionDate: lastRow[COLUMNS.RESOLUTION_DATE],
         timeToBreach: lastRow[COLUMNS.RESP_REM],
@@ -97,21 +98,25 @@ const ReportViewer = ({ rawData, yearMonth, headerIndices }) => {
         const ticketDate = parseDDMMYYYY(ticket.creationDate);
         if (ticketDate > filters.creationDateTo) return false;
       }
+// Priority filter
+if (filters.priority.length > 0 && !filters.priority.includes(ticket.priority)) return false;
 
-      // Priority filter
-      if (filters.priority && ticket.priority !== filters.priority) return false;
+// Assigned to filter
+if (filters.assignedTo.length > 0 && !filters.assignedTo.includes(ticket.assignedTo)) {
+  return false;
+}
 
-      // Assigned to filter
-      if (filters.assignedTo && ticket.assignedTo !== filters.assignedTo) return false;
+// Status filter
+if (filters.status.length > 0 && !filters.status.includes(ticket.currentStatus)) return false;
 
-      // Status filter
-      if (filters.status && ticket.currentStatus !== filters.status) return false;
+// Breached filter
+if (filters.breached.length > 0) {
+  const ticketBreached = ticket.isBreached ? 'true' : 'false';
+  if (!filters.breached.includes(ticketBreached)) return false;
+}
 
-      // Breached filter
-      if (filters.breached !== '') {
-        const filterBreached = filters.breached === 'true';
-        if (ticket.isBreached !== filterBreached) return false;
-      }
+// Macro Area filter
+if (filters.marconaName.length > 0 && !filters.marconaName.includes(ticket.marconaName)) return false;
 
       // Time to Breach filter
       if (filters.timeToBreachValue) {
@@ -166,10 +171,11 @@ const ReportViewer = ({ rawData, yearMonth, headerIndices }) => {
     setFilters({
       creationDateFrom: null,
       creationDateTo: null,
-      priority: '',
-      assignedTo: '',
-      status: '',
-      breached: '',
+      priority: [], // Changed to array
+      assignedTo: [], // Already array
+      status: [], // Changed to array
+      breached: [], // Changed to array
+      marconaName: [], // Changed to array
       searchText: '',
       timeToBreachOption: 'eq',
       timeToBreachValue: ''

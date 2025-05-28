@@ -5,14 +5,14 @@ const TableReport = ({ data, filters, onFilterChange, onResetFilters, getUniqueV
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
-console.log(data)
   const columns = [
     { key: 'ticketId', name: 'Ticket ID' },
     { key: 'creationDate', name: 'Creation Date' },
     { key: 'priority', name: 'Priority' },
     { key: 'assignedTo', name: 'Assigned To' },
+    { key: 'marconaName', name: 'Macro Area - Name' },
     { key: 'currentStatus', name: 'Current Status' },
-    { key: 'totalTime', name: 'Response Time' },
+    { key: 'totalTime', name: 'Resolution SLA Time' },
     { key: 'elapsedTime', name: 'Elapsed Time (h)' },
     { key: 'totalTime', name: 'Remaining Time' },
     { key: 'isBreached', name: 'Breached' }
@@ -123,6 +123,7 @@ console.log(data)
                   </span>
                 </td>
                 <td>{ticket.assignedTo}</td>
+                <td>{ticket.marconaName}</td>
                 <td>
                   <span className={`badge ${getBadgeClass(ticket.currentStatus)}`}>
                     {ticket.currentStatus}

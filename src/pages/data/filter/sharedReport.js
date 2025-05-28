@@ -11,91 +11,127 @@ const SharedFilters = ({
 }) => {
   return (
     <div className="filter-section">
-
-
       <div className="filter-grid">
-        {/* <div className="filter-group">
-          <label className="filter-label">Creation Date From</label>
-          <DatePicker
-            selected={filters.creationDateFrom}
-            onChange={(date) => onFilterChange('creationDateFrom', date)}
-            className="filter-input"
-            placeholderText="Select start date"
-          />
-        </div>
-
-        <div className="filter-group">
-          <label className="filter-label">Creation Date To</label>
-          <DatePicker
-            selected={filters.creationDateTo}
-            onChange={(date) => onFilterChange('creationDateTo', date)}
-            className="filter-input"
-            placeholderText="Select end date"
-          />
-        </div> */}
-
-        {/* Priority */}
+        {/* Priority - Updated for multi-select */}
         <div className="filter-group">
           <label className="filter-label">Priority</label>
           <Select
-            options={[
-              { value: '', label: 'All' },
-              ...getUniqueValues('priority').map(priority => ({ value: priority, label: priority }))
-            ]}
-            value={{ value: filters.priority, label: filters.priority || 'All' }}
-            onChange={(option) => onFilterChange('priority', option.value)}
+            isMulti
+            options={getUniqueValues('priority').map(priority => ({ 
+              value: priority, 
+              label: priority 
+            }))}
+            value={filters.priority 
+              ? filters.priority.map(priority => ({ value: priority, label: priority }))
+              : []
+            }
+            onChange={(options) => onFilterChange(
+              'priority', 
+              options ? options.map(opt => opt.value) : []
+            )}
             className="basic-select"
             classNamePrefix="select"
+            closeMenuOnSelect={false}
+            placeholder="Select priorities..."
           />
         </div>
 
-        {/* Assigned To */}
+        {/* Assigned To - multi-select */}
         <div className="filter-group">
           <label className="filter-label">Resource</label>
           <Select
-            options={[
-              { value: '', label: 'All' },
-              ...getUniqueValues('assignedTo').map(name => ({ value: name, label: name }))
-            ]}
-            value={{ value: filters.assignedTo, label: filters.assignedTo || 'All' }}
-            onChange={(option) => onFilterChange('assignedTo', option.value)}
+            isMulti
+            options={getUniqueValues('assignedTo').map(name => ({ 
+              value: name, 
+              label: name 
+            }))}
+            value={filters.assignedTo 
+              ? filters.assignedTo.map(name => ({ value: name, label: name }))
+              : []
+            }
+            onChange={(options) => onFilterChange(
+              'assignedTo', 
+              options ? options.map(opt => opt.value) : []
+            )}
             className="basic-select"
             classNamePrefix="select"
+            closeMenuOnSelect={false}
+            placeholder="Select resources..."
           />
         </div>
 
-        {/* Status */}
+        {/* Macro Area - Name - multi-select */}
+        <div className="filter-group">
+          <label className="filter-label">Macro Area - Name</label>
+          <Select
+            isMulti
+            options={getUniqueValues('marconaName').map(name => ({ 
+              value: name, 
+              label: name 
+            }))}
+            value={filters.marconaName 
+              ? filters.marconaName.map(name => ({ value: name, label: name }))
+              : []
+            }
+            onChange={(options) => onFilterChange(
+              'marconaName', 
+              options ? options.map(opt => opt.value) : []
+            )}
+            className="basic-select"
+            classNamePrefix="select"
+            closeMenuOnSelect={false}
+            placeholder="Select macro areas..."
+          />
+        </div>
+
+        {/* Status - multi-select */}
         <div className="filter-group">
           <label className="filter-label">Status</label>
           <Select
-            options={[
-              { value: '', label: 'All' },
-              ...getUniqueValues('currentStatus').map(status => ({ value: status, label: status }))
-            ]}
-            value={{ value: filters.status, label: filters.status || 'All' }}
-            onChange={(option) => onFilterChange('status', option.value)}
+            isMulti
+            options={getUniqueValues('currentStatus').map(status => ({ 
+              value: status, 
+              label: status 
+            }))}
+            value={filters.status 
+              ? filters.status.map(status => ({ value: status, label: status }))
+              : []
+            }
+            onChange={(options) => onFilterChange(
+              'status', 
+              options ? options.map(opt => opt.value) : []
+            )}
             className="basic-select"
             classNamePrefix="select"
+            closeMenuOnSelect={false}
+            placeholder="Select statuses..."
           />
         </div>
 
-        {/* Breached */}
+        {/* Breached - multi-select */}
         <div className="filter-group">
           <label className="filter-label">Breached</label>
           <Select
+            isMulti
             options={[
-              { value: '', label: 'All' },
               { value: 'true', label: 'Yes' },
               { value: 'false', label: 'No' }
             ]}
-            value={{ 
-              value: filters.breached, 
-              label: filters.breached === 'true' ? 'Yes' : 
-                    filters.breached === 'false' ? 'No' : 'All'
-            }}
-            onChange={(option) => onFilterChange('breached', option.value)}
+            value={filters.breached 
+              ? filters.breached.map(breached => ({ 
+                  value: breached, 
+                  label: breached === 'true' ? 'Yes' : 'No' 
+                }))
+              : []
+            }
+            onChange={(options) => onFilterChange(
+              'breached', 
+              options ? options.map(opt => opt.value) : []
+            )}
             className="basic-select"
             classNamePrefix="select"
+            closeMenuOnSelect={false}
+            placeholder="Select breach status..."
           />
         </div>
 
