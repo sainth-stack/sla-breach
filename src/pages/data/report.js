@@ -64,13 +64,13 @@ const [finalData,setFinalData]=useState([])
 
     // Total # of tickets completed (Rollover matches yearMonth)
     const ticketsCompleted = data.filter(row => 
-      row[headerIndices.rollover] === yearMonth
+      row[headerIndices.rollover] === yearMonth && row[headerIndices.reqComp]==="End"
     ).length;
       
     // Resolution SLA
     const resolutionSLA = data.filter(row => 
       row[headerIndices.rollover] === yearMonth &&  
-      row[headerIndices.resolRem] >= 0            
+      row[headerIndices.resolRem] >= 0  && row[headerIndices.reqComp]==="End"        
     ).length;
       
     const resolutionSLAPercentage = ticketsCompleted > 0 

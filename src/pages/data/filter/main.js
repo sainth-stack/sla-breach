@@ -67,7 +67,7 @@ const ReportViewer = ({ rawData, yearMonth, headerIndices }) => {
         marconaName: lastRow[COLUMNS.MARCO],
         currentStatus: lastRow[COLUMNS.CURRENT_STATUS],
         elapsedTime: lastRow[COLUMNS.ELAPSED_TIME],
-        isBreached:lastRow[COLUMNS.RESP_REM] >0 ? false : true,
+        isBreached:lastRow[COLUMNS.RESP_REM] <0 ? true : false,
         status: lastRow[COLUMNS.REQ_STATUS],
         resolutionDate: lastRow[COLUMNS.RESOLUTION_DATE],
         timeToBreach: lastRow[COLUMNS.RESP_REM],
