@@ -71,7 +71,7 @@ const TableReport = ({ data, filters, onFilterChange, onResetFilters, getUniqueV
   return (
     <div className="report-card">
       <div className="report-header">
-        <h1 className="report-title">Management Report - Table View</h1>
+        <h1 className="report-title">SLA Monitoring</h1>
       </div>
 
       <SharedFilters 

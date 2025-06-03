@@ -23,6 +23,8 @@ const YELLOW_FIELDS = [
   "RespRem",
   "Rollover",
   "ReqCrYM",
+  "DateRollover",
+  "DateReqCrYM"
 ];
 
 // Holiday data for multiple years (2021-2025)
@@ -749,6 +751,7 @@ newRow[headerIndices.refinedpredt] =
       }
 
       const currentRollover = newRow[headerIndices.rollover];
+      newRow[headerIndices.dateRollover] = currentRollover;
       newRow[headerIndices.reqcrym] =
         currentRollover && currentRollover.trim() !== ""
           ? newRow[headerIndices.reqCreationDate]
@@ -774,6 +777,11 @@ newRow[headerIndices.refinedpredt] =
             : " "
           : "9999 12";
 
+      newRow[headerIndices.dateReqCrYM] = newRow[headerIndices.reqCreationDate];
+      newRow[headerIndices.dateRollover] = newRow[headerIndices.rollover];
+
+      // Set DateReqCrYM to be exactly the same as ReqCrYM
+      newRow[headerIndices.dateReqCrYM] = newRow[headerIndices.reqcrym];
       lastProcessedRow = newRow;
       if(requestId=="A2266513L"){
         console.log(newRow,'fsjkfjnds')
@@ -789,21 +797,58 @@ newRow[headerIndices.refinedpredt] =
   
     const wb = XLSX.utils.book_new();
     const [headers, ...rows] = csvData;
-    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    
+    // Format date fields in the data
+    const formattedRows = rows.map(row => {
+        const newRow = [...row];
+        // Indexes to format: 0 (Req. Creation Date), 7 (Historical Status - Change Date), 
+        // 24 (ReqCrDtConc), 26 (HisChDtTiConc)
+        const dateIndexes = [0, 7];
+        
+        // Format Historical Status - Change Time (assuming it's at index 8)
+        const changeTimeIndex = headers.indexOf("Historical Status - Change Time");
+        if (changeTimeIndex !== -1 && newRow[changeTimeIndex]) {
+            const timeStr = newRow[changeTimeIndex].toString().padStart(6, '0');
+            newRow[changeTimeIndex] = `${timeStr.slice(0, 2)}:${timeStr.slice(2, 4)}:${timeStr.slice(4, 6)}`;
+        }
+
+        dateIndexes.forEach(index => {
+            if (newRow[index]) {
+                // If it's a date string in format "dd/mm/yyyy"
+                if (typeof newRow[index] === 'string' && newRow[index].match(/^\d{2}\/\d{2}\/\d{4}$/)) {
+                    const [dd, mm, yyyy] = newRow[index].split('/');
+                    newRow[index] = `${mm}/${dd}/${yyyy}`;
+                }
+                // If it's an Excel date number (like 45419)
+                else if (typeof newRow[index] === 'number') {
+                    const date = XLSX.SSF.parse_date_code(newRow[index]);
+                    newRow[index] = `${(date.m).toString().padStart(2, '0')}/${(date.d).toString().padStart(2, '0')}/${date.y}`;
+                }
+                // If it's a datetime string like "04/01/2024 01:45:31"
+                else if (typeof newRow[index] === 'string' && newRow[index].match(/^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}:\d{2}$/)) {
+                    const [datePart] = newRow[index].split(' ');
+                    const [dd, mm, yyyy] = datePart.split('/');
+                    newRow[index] = `${mm}/${dd}/${yyyy}`;
+                }
+            }
+        });
+        return newRow;
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...formattedRows]);
   
     const HIGHLIGHT_FIELDS = [
       "ResolSLA", "RespSLA", "ReqComp", "ReqCrDtConc", "EnDtConc", 
       "HisChDtTiConc", "ElapsedTime", "CalcPreDt", "RefinedPreDt", 
       "CalcStDt", "RefinedStDt", "Cumilative", "ResolSOW", "RespSOW", 
-      "ResolRem", "RespRem", "Rollover", "ReqCrYM"
+      "ResolRem", "RespRem", "Rollover", "ReqCrYM", "DateRollover", "DateReqCrYM"
     ];
   
-    // Find column indexes of fields to highlight
     const highlightCols = headers.reduce((acc, header, idx) => {
       if (HIGHLIGHT_FIELDS.includes(header)) acc[idx] = true;
       return acc;
     }, {});
-    // Apply styles
+    
     Object.keys(ws).forEach(key => {
       if (key !== '!ref') {
         const col = XLSX.utils.decode_cell(key).c;
@@ -823,7 +868,7 @@ newRow[headerIndices.refinedpredt] =
   
     XLSX.utils.book_append_sheet(wb, ws, "ProcessedData");
     XLSX.writeFile(wb, "sla_report.xlsx");
-  };
+};
 
   return (
     <div className="min-h-screen bg-gray-100 flex justify-center p-6" style={{marginLeft:'280px'}}>

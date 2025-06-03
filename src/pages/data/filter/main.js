@@ -184,7 +184,7 @@ if (filters.marconaName.length > 0 && !filters.marconaName.includes(ticket.marco
 
   return (
     <div className="combined-report-container">
-      <div className="view-switcher">
+      {/* <div className="view-switcher">
         <button
           className={`view-button ${activeView === 'table' ? 'active' : ''}`}
           onClick={() => setActiveView('table')}
@@ -197,7 +197,7 @@ if (filters.marconaName.length > 0 && !filters.marconaName.includes(ticket.marco
         >
           Analytics View
         </button>
-      </div>
+      </div> */}
 
       {activeView === 'table' ? (
         <TableReport 
