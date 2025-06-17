@@ -413,11 +413,33 @@ export const MainPages = () => {
         groupedData[id].sort((a, b) => {
             // Try to sort by change date + time if available
             if (changeDateIndex !== -1 && changeTimeIndex !== -1) {
-                const dateA = dateUtils.parseDateTime(`${a[changeDateIndex]} ${a[changeTimeIndex]}`);
-                const dateB = dateUtils.parseDateTime(`${b[changeDateIndex]} ${b[changeTimeIndex]}`);
-                return dateA - dateB;
+                const dateA = a[changeDateIndex];
+                const dateB = b[changeDateIndex];
+                const timeA = a[changeTimeIndex];
+                const timeB = b[changeTimeIndex];
+
+                // Parse dates (DD/MM/YYYY)
+                const [dayA, monthA, yearA] = dateA.split('/').map(Number);
+                const [dayB, monthB, yearB] = dateB.split('/').map(Number);
+
+                // Create Date objects
+                const dateObjA = new Date(yearA, monthA - 1, dayA);
+                const dateObjB = new Date(yearB, monthB - 1, dayB);
+
+                // If dates are different, sort by date
+                if (dateObjA.getTime() !== dateObjB.getTime()) {
+                    return dateObjA - dateObjB;
+                }
+
+                // If dates are same, sort by time
+                const [hoursA, minutesA, secondsA] = timeA.toString().padStart(6, '0').match(/.{1,2}/g).map(Number);
+                const [hoursB, minutesB, secondsB] = timeB.toString().padStart(6, '0').match(/.{1,2}/g).map(Number);
+
+                // Compare times
+                if (hoursA !== hoursB) return hoursA - hoursB;
+                if (minutesA !== minutesB) return minutesA - minutesB;
+                return secondsA - secondsB;
             }
-            // Fallback: keep original order if no date/time columns
             return 0;
         });
     });
@@ -563,7 +585,7 @@ export const MainPages = () => {
 
       const allowedStatusesTo = [
         "Work in progress", "Forwarded", "Assigned", 
-        "Solved", "Suspended", "Pending for IT check"
+        "Solved", "Suspended", "Pending for IT check","Awaiting external provider"
       ];
       const excludedStatusesFrom = [
         "Suspended", "Pending for IT check", 
@@ -585,8 +607,6 @@ export const MainPages = () => {
         index === 0 || requestId !== rows[index - 1]?.[headerIndices.requestId]
           ? "Yes"
           : " ";
-
-      newRow[headerIndices.reqcomp] = statusTo === "Closed" ? "End" : " ";
 
       newRow[headerIndices.reqcrdtconc] =
         newRow[headerIndices.respsla] === "Yes" && creationDateTime
@@ -619,6 +639,7 @@ export const MainPages = () => {
         index < firstPassRows.length - 1 ? firstPassRows[index + 1] : null;
       const prevRequestId = prevRow ? prevRow[headerIndices.requestId] : null;
       const nextRequestId = nextRow ? nextRow[headerIndices.requestId] : null;
+      const statusTo = (newRow[headerIndices.historicalStatusTo] || "").toString().trim();
 
       if (
         newRow[headerIndices.resolsla] === "Yes" &&
@@ -681,7 +702,12 @@ export const MainPages = () => {
       }
 
 
-
+      newRow[headerIndices.reqcomp] = 
+      (statusTo === "Closed" || statusTo === "Discarded") 
+        ? "End" 
+        : (nextRow && requestId !== nextRequestId)
+          ? "Open" 
+          : " ";
 
 newRow[headerIndices.refinedpredt] =
   parseFloat(newRow[headerIndices.calcpredt] || 0) < 0 ||
@@ -713,12 +739,13 @@ newRow[headerIndices.refinedpredt] =
             ).toFixed(2)
           : "0";
 
+          console.log(prevRow?.[headerIndices.resprem] )
       newRow[headerIndices.resprem] =
         newRow[headerIndices.respsla] === "Yes"
           ? parseFloat(newRow[headerIndices.respsow] || 0) -
             parseFloat(newRow[headerIndices.calcstdt] || 0)
-          : 0;
-      newRow[headerIndices.resprem] = newRow[headerIndices.resprem].toFixed(2);
+          : (Number(prevRow?.[headerIndices.resprem]) || 0);
+      newRow[headerIndices.resprem] = (newRow[headerIndices.resprem]||0)?.toFixed(2);
 
       if (requestId === nextRequestId) {
         newRow[headerIndices.rollover] = "2000 01";
@@ -804,14 +831,12 @@ newRow[headerIndices.refinedpredt] =
         // Indexes to format: 0 (Req. Creation Date), 7 (Historical Status - Change Date), 
         // 24 (ReqCrDtConc), 26 (HisChDtTiConc)
         const dateIndexes = [0, 7];
-        
-        // Format Historical Status - Change Time (assuming it's at index 8)
         const changeTimeIndex = headers.indexOf("Historical Status - Change Time");
         if (changeTimeIndex !== -1 && newRow[changeTimeIndex]) {
             const timeStr = newRow[changeTimeIndex].toString().padStart(6, '0');
             newRow[changeTimeIndex] = `${timeStr.slice(0, 2)}:${timeStr.slice(2, 4)}:${timeStr.slice(4, 6)}`;
         }
-
+        
         dateIndexes.forEach(index => {
             if (newRow[index]) {
                 // If it's a date string in format "dd/mm/yyyy"

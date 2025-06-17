@@ -20,12 +20,12 @@ export default function Sidebar() {
               <span className="link-text">SLA BREACH</span>
             </Link>
           </li>
-          {/* <li className={`sidebar-item mt-2 ${location.pathname === "/bot" ? "active" : ""}`}>
+          <li className={`sidebar-item mt-2 ${location.pathname === "/bot" ? "active" : ""}`}>
             <Link to="/bot" className="sidebar-link">
               <BiAnalyse size={20} />
-              <span className="link-text">SLA BREACH Automatic</span>
+              <span className="link-text">SLA Agent</span>
             </Link>
-          </li> */}
+          </li>
           {/* <li className={`sidebar-item mt-2 ${location.pathname === "/missing-value" ? "active" : ""}`}>
             <Link to="/missing-value" className="sidebar-link">
               <RiFileWarningLine size={20} />

@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import SharedFilters from '../filter/sharedReport';
 
 const TableReport = ({ data, filters, onFilterChange, onResetFilters, getUniqueValues }) => {
+  console.log(filters)
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;

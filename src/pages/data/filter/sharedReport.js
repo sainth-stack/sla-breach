@@ -12,6 +12,8 @@ const SharedFilters = ({
   return (
     <div className="filter-section">
       <div className="filter-grid">
+        {/* Request Type - multi-select */}
+
         {/* Priority - Updated for multi-select */}
         <div className="filter-group">
           <label className="filter-label">Priority</label>
@@ -163,6 +165,28 @@ const SharedFilters = ({
               onChange={(e) => onFilterChange('timeToBreachValue', e.target.value)}
             />
           </div>
+        </div>
+        <div className="filter-group">
+          <label className="filter-label">Request Type</label>
+          <Select
+            isMulti
+            options={getUniqueValues('requestType').map(type => ({ 
+              value: type, 
+              label: type 
+            }))}
+            value={filters.requestType 
+              ? filters.requestType.map(type => ({ value: type, label: type }))
+              : []
+            }
+            onChange={(options) => onFilterChange(
+              'requestType', 
+              options ? options.map(opt => opt.value) : []
+            )}
+            className="basic-select"
+            classNamePrefix="select"
+            closeMenuOnSelect={false}
+            placeholder="Select request types..."
+          />
         </div>
       </div>
       <div className="flex justify-between items-center mt-4">

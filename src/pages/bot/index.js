@@ -24,25 +24,6 @@ const Bot = () => {
   const handleFileChange = async (e) => {
     const selectedFile = e.target.files[0];
     setFile(selectedFile);
-    
-    if (selectedFile) {
-      setIsLoading(true);
-      const formData = new FormData();
-      formData.append('file', selectedFile);
-
-      try {
-        const response = await fetch('http://18.142.48.224:8000/sla_processing', {
-          method: 'POST',
-          body: formData,
-        });
-        const data = await response.json();
-        console.log(data);
-      } catch (error) {
-        console.error('Error uploading file:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    }
   };
 
   const handleSubmit = async (e) => {
@@ -53,18 +34,22 @@ const Bot = () => {
     setMessages(prev => [...prev, { 
       type: 'user', 
       content: message,
-      question:true,
+      question: true,
       isLoading: true 
     }]);
     
     setIsLoading(true);
     const formData = new FormData();
     formData.append('query', message);
+    
+    if (file) {
+      formData.append('file', file);
+    }
 
     try {
-      setIsLoading(true); // Ensure loading starts before the request
-    
-      const endpoint = 'http://18.142.48.224:8000/sla_query';
+      setIsLoading(true);
+      
+      const endpoint = 'http://18.142.48.224:8000/query_making';
       
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -81,9 +66,8 @@ const Bot = () => {
         msg.isLoading ? { ...msg, isLoading: false } : msg
       ).concat([{ 
         type: 'bot', 
-        content:data?.answer,
-        // plotsData:data?.chart_response,
-        code:data?.code || "Not Found"
+        content: data?.answer,
+        code: data?.code || "Not Found"
       }]));
     
       setRecentChats(prev => [...prev, { question: message, answer: data?.result }]);
@@ -100,13 +84,12 @@ const Bot = () => {
         type: 'bot', 
         content: 'Sorry, there was an error processing your request.',
         messageType: 'text',
-        code:'Not Found'
+        code: 'Not Found'
       }]));
     } finally {
-      setIsLoading(false); // Ensure loader stops in both success and failure cases
-      setMessage(''); 
+      setIsLoading(false);
+      setMessage('');
     }
-    
   };
 
   const fileInputRef = useRef(null);

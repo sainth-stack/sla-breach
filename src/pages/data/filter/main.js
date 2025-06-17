@@ -7,6 +7,7 @@ import '../table-report/TableReport.css'
 const ReportViewer = ({ rawData, yearMonth, headerIndices }) => {
   const [activeView, setActiveView] = useState('table');
   const [filters, setFilters] = useState({
+    requestType: [], // Added Request Type filter
     creationDateFrom: null,
     creationDateTo: null,
     priority: [], // Changed to array
@@ -37,7 +38,8 @@ const ReportViewer = ({ rawData, yearMonth, headerIndices }) => {
     RESP_REM: 35,
     MARCO:9,
     REQ_STATUS: rawData[0].indexOf("Req. Status - Description"),
-    RESOLUTION_DATE: rawData[0].indexOf("Req. Resolution Date")
+    RESOLUTION_DATE: rawData[0].indexOf("Req. Resolution Date"),
+    REQUEST_TYPE: rawData[0].indexOf("Req. Type - Description EN")
   };
 
   const processedData = useMemo(() => {
@@ -72,6 +74,7 @@ const ReportViewer = ({ rawData, yearMonth, headerIndices }) => {
         resolutionDate: lastRow[COLUMNS.RESOLUTION_DATE],
         timeToBreach: lastRow[COLUMNS.RESP_REM],
         totalTime:lastRow[COLUMNS.resolSW],
+        requestType: lastRow[COLUMNS.REQUEST_TYPE],
         statusChanges: ticketRows.map(row => ({
           from: row[COLUMNS.STATUS_FROM],
           to: row[COLUMNS.STATUS_TO],
@@ -98,25 +101,29 @@ const ReportViewer = ({ rawData, yearMonth, headerIndices }) => {
         const ticketDate = parseDDMMYYYY(ticket.creationDate);
         if (ticketDate > filters.creationDateTo) return false;
       }
-// Priority filter
-if (filters.priority.length > 0 && !filters.priority.includes(ticket.priority)) return false;
 
-// Assigned to filter
-if (filters.assignedTo.length > 0 && !filters.assignedTo.includes(ticket.assignedTo)) {
-  return false;
-}
+      // Add filter logic after the creation date filter and before priority filter
+      if (filters.requestType.length > 0 && !filters.requestType.includes(ticket.requestType)) return false;
 
-// Status filter
-if (filters.status.length > 0 && !filters.status.includes(ticket.currentStatus)) return false;
+      // Priority filter
+      if (filters.priority.length > 0 && !filters.priority.includes(ticket.priority)) return false;
 
-// Breached filter
-if (filters.breached.length > 0) {
-  const ticketBreached = ticket.isBreached ? 'true' : 'false';
-  if (!filters.breached.includes(ticketBreached)) return false;
-}
+      // Assigned to filter
+      if (filters.assignedTo.length > 0 && !filters.assignedTo.includes(ticket.assignedTo)) {
+        return false;
+      }
 
-// Macro Area filter
-if (filters.marconaName.length > 0 && !filters.marconaName.includes(ticket.marconaName)) return false;
+      // Status filter
+      if (filters.status.length > 0 && !filters.status.includes(ticket.currentStatus)) return false;
+
+      // Breached filter
+      if (filters.breached.length > 0) {
+        const ticketBreached = ticket.isBreached ? 'true' : 'false';
+        if (!filters.breached.includes(ticketBreached)) return false;
+      }
+
+      // Macro Area filter
+      if (filters.marconaName.length > 0 && !filters.marconaName.includes(ticket.marconaName)) return false;
 
       // Time to Breach filter
       if (filters.timeToBreachValue) {
@@ -169,13 +176,14 @@ if (filters.marconaName.length > 0 && !filters.marconaName.includes(ticket.marco
   // Reset all filters
   const resetFilters = () => {
     setFilters({
+      requestType: [], // Added Request Type
       creationDateFrom: null,
       creationDateTo: null,
-      priority: [], // Changed to array
-      assignedTo: [], // Already array
-      status: [], // Changed to array
-      breached: [], // Changed to array
-      marconaName: [], // Changed to array
+      priority: [],
+      assignedTo: [],
+      status: [],
+      breached: [],
+      marconaName: [],
       searchText: '',
       timeToBreachOption: 'eq',
       timeToBreachValue: ''

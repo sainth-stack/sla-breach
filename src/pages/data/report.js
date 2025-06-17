@@ -122,7 +122,7 @@ const Report = ({ data }) => {
 
   return (
     <div className="mx-auto p-6 bg-white rounded-lg shadow-md" style={{marginTop:'30px'}}>
-      {/* <div className="mb-8">
+      <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-800 mb-2">
           {yearMonth ? `Report for the month of:` : "Complete Report"}
         </h1>
@@ -135,7 +135,7 @@ const Report = ({ data }) => {
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+      {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
         <div className="bg-blue-50 p-6 rounded-lg">
           <h2 className="text-xl font-semibold text-blue-800 mb-4">Ticket Overview</h2>
           <div className="space-y-4">
