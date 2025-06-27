@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import TableReport from '../table-report/index';
 import PiechartReport from '../piechart/piechart-report';
+import { isSuperAdmin, getUserName } from '../../../utils/auth';
 import '../piechart/PiechartReport.css';
 import '../table-report/TableReport.css'
 
@@ -19,7 +20,6 @@ const ReportViewer = ({ rawData, yearMonth, headerIndices }) => {
     timeToBreachOption: 'eq',
     timeToBreachValue: ''
   });
-
   // Constants for column indexes
   const COLUMNS = {
     RESP_SLA: 22,
@@ -48,6 +48,8 @@ const ReportViewer = ({ rawData, yearMonth, headerIndices }) => {
     const headers = rawData[0];
     const rows = rawData.slice(1);
     const ticketGroups = {};
+    const currentUserName = getUserName();
+    const isUserSuperAdmin = isSuperAdmin();
   
     rows.forEach(row => {
       const ticketId = row[COLUMNS.TICKET_ID];
@@ -58,7 +60,7 @@ const ReportViewer = ({ rawData, yearMonth, headerIndices }) => {
       ticketGroups[ticketId].push(row);
     });
   
-    return Object.values(ticketGroups).map(ticketRows => {
+    let processedTickets = Object.values(ticketGroups).map(ticketRows => {
       const lastRow = ticketRows[ticketRows.length - 1];
       
       return {
@@ -82,6 +84,20 @@ const ReportViewer = ({ rawData, yearMonth, headerIndices }) => {
         }))
       };
     });
+
+    // Filter data based on user permissions
+    if (!isUserSuperAdmin && currentUserName) {
+      console.log('🔒 User is not super admin, filtering data for:', currentUserName);
+      console.log('📊 Total tickets before filtering:', processedTickets.length);
+      processedTickets = processedTickets.filter(ticket => 
+        ticket.assignedTo && ticket.assignedTo.toUpperCase() === currentUserName.toUpperCase()
+      );
+      console.log('📊 Total tickets after filtering:', processedTickets.length);
+    } else {
+      console.log('🔓 User is super admin or no user name, showing all data');
+    }
+
+    return processedTickets;
   }, [rawData]);
 
   // Filter data based on filters
@@ -159,10 +175,26 @@ const ReportViewer = ({ rawData, yearMonth, headerIndices }) => {
   // Get unique values for filter dropdowns
   const getUniqueValues = (property) => {
     const values = new Set();
+    const currentUserName = getUserName();
+    const isUserSuperAdmin = isSuperAdmin();
+    
     processedData.forEach(ticket => {
       if (ticket[property]) values.add(ticket[property]);
     });
-    return Array.from(values).sort();
+    
+    let uniqueValues = Array.from(values).sort();
+    
+    // For assignedTo filter, if user is not super admin, only show current user
+    if (property === 'assignedTo' && !isUserSuperAdmin && currentUserName) {
+      console.log('🔒 Filtering assignedTo options for non-super admin user:', currentUserName);
+      console.log('📋 All available assignedTo values:', uniqueValues);
+      uniqueValues = uniqueValues.filter(value => 
+        value.toUpperCase() === currentUserName.toUpperCase()
+      );
+      console.log('📋 Filtered assignedTo values:', uniqueValues);
+    }
+    
+    return uniqueValues;
   };
 
   // Handle filter changes

@@ -3,11 +3,17 @@ import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
 import './style.css'
 import { Outlet, Navigate, useNavigate } from "react-router-dom"
+
 export function AdminLayout(props) {
   const isAuthenticated = () => {
-    const accessToken = localStorage.getItem("token")
-    return true
+    const token = localStorage.getItem("token");
+    const user = localStorage.getItem("user");
+    const isAuth = localStorage.getItem("isAuthenticated");
+    
+    // Check if user is authenticated using any of the stored values
+    return token === "authenticated" || (user && isAuth === "true");
   }
+
   return (
     <div className="row p-0 m-0">
       <React.Fragment>

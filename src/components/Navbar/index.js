@@ -1,54 +1,78 @@
 /* eslint-disable no-unused-vars */
 import React, { useEffect, useState, useRef } from "react";
-// import "./styles.scss";
-// import userprofile from '../../assets/images/userprofile.png'
+import "./styles.css";
 import { useNavigate } from "react-router-dom";
-// import Logo from '../../assets/images/logo3.png'
-import { AiTwotoneCalendar } from 'react-icons/ai'
 import { useLocation } from "react-router-dom";
+
 function Navbar() {
   const navigate = useNavigate()
-  const [name, setName] = useState("Dashboard")
+  const [currentUser, setCurrentUser] = useState(null)
+  const [showUserMenu, setShowUserMenu] = useState(false)
+  
   const handleLogout = () => {
+    // Clear all authentication data from localStorage
     localStorage.removeItem("token")
+    localStorage.removeItem("user")
+    localStorage.removeItem("isAuthenticated")
+    localStorage.removeItem("username")
+    localStorage.removeItem("email")
+    localStorage.removeItem("_id")
+    
+    // Navigate to login page
     navigate('/login')
   }
+  
   let location = useLocation();
+  
   useEffect(() => {
-    if (location.pathname == '/productivity') {
-      setName("Productivity")
-    } else if (location.pathname == '/resilience') {
-      setName("Resilience")
-    } else if (location.pathname == '/sustainability') {
-      setName("Sustainability")
-    } else if (location.pathname == '/reports' || location.pathname=='/review-report') {
-      setName("Reports")
-    } else {
-      setName("KProcess")
+    // Get current user from localStorage
+    const userData = localStorage.getItem("user");
+    if (userData) {
+      try {
+        const user = JSON.parse(userData);
+        setCurrentUser(user);
+      } catch (error) {
+        console.error("Failed to parse user data:", error);
+      }
     }
-  }, [location.pathname])
-
+  }, []);
 
   return (
     <>
-      <nav class="navbar navbar-expand-lg  navbar-light bg-white shadow-sm sticky-top bg-white-fixed">
-        <div class="collapse navbar-collapse" style={{ marginLeft: '0px',paddingLeft:'40px'}} id="navbarNav">
-          {/* <img
-            src={Logo}
-            style={{ width: '70px',height:'70px' }}
-            id="logo_RL"
-          /> */}
+      <nav className="simple-nav">
+        <div className="nav-right">
+          <div className="user-dropdown-container">
+            <button
+              className="user-btn"
+              onClick={() => setShowUserMenu(!showUserMenu)}
+            >
+              {currentUser?.name || 'User'}
+              <span className="dropdown-arrow">▼</span>
+            </button>
+            
+            {showUserMenu && (
+              <div className="dropdown-menu-absolute">
+                <div className="dropdown-email">
+                  {currentUser?.email || 'user@company.com'}
+                </div>
+                <button className="dropdown-logout" onClick={handleLogout}>
+                  Logout
+                </button>
+              </div>
+            )}
+          </div>
         </div>
-
-        <div className="position-absolute w-100 d-flex justify-content-center" style={{ pointerEvents: 'none' }}>
-          {/* <h2 style={{fontSize:'30px',fontWeight:'bold'}} className="m-0">DataPX1</h2> */}
-        </div>
-
-  
       </nav>
+      
+      {/* Click outside to close */}
+      {showUserMenu && (
+        <div 
+          className="overlay"
+          onClick={() => setShowUserMenu(false)}
+        />
+      )}
     </>
-
   );
-
 }
+
 export default Navbar;

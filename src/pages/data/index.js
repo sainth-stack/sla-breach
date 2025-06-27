@@ -1,7 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import Report from "./report";
+import { isSuperAdmin } from "../../utils/auth";
+import S3Service from "../../utils/s3Service";
 
 // Constants
 const YELLOW_FIELDS = [
@@ -254,11 +256,6 @@ const calculationUtils = {
       endDate,
       holidays
     );
-if(index==3){
-  console.log(networkDays,  adjustedStartDate,
-    endDate,
-    holidays,'networkDays')
-}
     if (networkDays === 0) return 0;
 
     const getMedTime = (date) => {
@@ -321,10 +318,122 @@ const isWorkingDay = (date, holidays) => {
 };
 
 export const MainPages = () => {
-  const [csvData, setCsvData] = useState(null);
   const [file, setFile] = useState(null);
+  const [csvData, setCsvData] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [availableData, setAvailableData] = useState([]);
+  const [isCheckingData, setIsCheckingData] = useState(true);
+  const [dataCheckComplete, setDataCheckComplete] = useState(false);
   const [holidays, setHolidays] = useState([]);
+  const [isUploading, setIsUploading] = useState(false);
+
+  // Check for available data on S3 when component loads
+  useEffect(() => {
+    checkAvailableData();
+  }, []);
+
+  const checkAvailableData = async () => {
+    setIsCheckingData(true);
+    try {
+      console.log('🔍 Checking for available data on S3...');
+      const result = await S3Service.listFiles();
+      if (result.success) {
+        // Filter for data files (CSV, Excel)
+        const dataFiles = result.files.filter(file => {
+          const extension = file.key.split('.').pop().toLowerCase();
+          return ['csv', 'xlsx', 'xls'].includes(extension);
+        });
+        
+        console.log('📊 Found data files on S3:', dataFiles);
+        setAvailableData(dataFiles);
+      } else {
+        console.error('❌ Failed to check S3 data:', result.error);
+        setAvailableData([]);
+      }
+    } catch (error) {
+      console.error('💥 Error checking S3 data:', error);
+      setAvailableData([]);
+    } finally {
+      setIsCheckingData(false);
+      setDataCheckComplete(true);
+    }
+  };
+
+  // Helper function to format file size
+  const formatFileSize = (bytes) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  // Function to load data from S3
+  const handleLoadFromS3 = async (dataFile) => {
+    try {
+      console.log('📥 Loading data from S3:', dataFile.key);
+      setIsProcessing(true);
+      
+      const result = await S3Service.downloadFile(dataFile.key);
+      if (result.success) {
+        // Convert blob to file-like object
+        const file = new File([result.blob], dataFile.key.split('-').slice(1).join('-'), {
+          type: result.contentType
+        });
+        
+        console.log('✅ Successfully loaded file from S3:', file.name);
+        setFile(file);
+        
+        // Determine file type and process accordingly
+        const fileExtension = file.name?.split(".").pop().toLowerCase();
+        
+        if (fileExtension === "csv") {
+          Papa.parse(file, {
+            complete: (result) => {
+              processData(result.data);
+              setIsProcessing(false);
+            },
+            error: (err) => {
+              console.error(err);
+              setIsProcessing(false);
+            },
+            skipEmptyLines: true,
+          });
+        } else if (["xlsx", "xls"].includes(fileExtension)) {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const data = e.target.result;
+            const workbook = XLSX.read(data, { type: "array" });
+            const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+            const range = XLSX.utils.decode_range(worksheet['!ref']);
+            range.e.c = 20; // force to include 21 columns (0-based index)
+            
+            worksheet['!ref'] = XLSX.utils.encode_range(range);
+            const excelData = XLSX.utils.sheet_to_json(worksheet, {
+              header: 1,
+              defval: "",
+            });
+            console.log('Excel data loaded from S3:', excelData);
+            processData(excelData);
+            setIsProcessing(false);
+          };
+          reader.readAsArrayBuffer(file);
+        } else {
+          console.error("Unsupported file type");
+          setIsProcessing(false);
+        }
+        
+      } else {
+        console.error('❌ Failed to load file from S3:', result.error);
+        alert('Failed to load file from S3: ' + result.error);
+        setIsProcessing(false);
+      }
+    } catch (error) {
+      console.error('💥 Error loading from S3:', error);
+      alert('Error loading file: ' + error.message);
+      setIsProcessing(false);
+    }
+  };
 
   const getHolidaysForYears = (years) => {
     const uniqueYears = [...new Set(years)];
@@ -335,13 +444,15 @@ export const MainPages = () => {
         allHolidays.push(...HOLIDAYS_BY_YEAR[year]);
       }
     });
-    console.log(allHolidays,'all holidays')
     return allHolidays;
   };
 
   const processExcelData = (data) => {
-    console.log(data,'sdfijsn')
-    const headers = data[0].map((h) => h?.toString().trim() || "");
+    console.log('Raw data:', data);
+    const headers = data[0];
+    console.log('Original headers:', headers);
+    console.log('Request - Subject description index:', headers.indexOf('Request - Subject description'));
+    
     const reqCreationDateIndex = headers.indexOf("Req. Creation Date");
     const historicalStatusChangeDateIndex = headers.indexOf(
         "Historical Status - Change Date"
@@ -371,22 +482,35 @@ export const MainPages = () => {
             return newRow;
         });
 
-    // Identify empty columns (columns where all cells are empty)
+    // Identify empty columns (columns where all cells are empty AND header is empty)
     const emptyColumns = [];
     for (let col = 0; col < headers.length; col++) {
         const isHeaderEmpty = headers[col] === "";
-        const isColumnEmpty = rows.every(row => row[col] === "" || row[col] === undefined || row[col] === null);
+        const isColumnEmpty = rows.every(row => 
+            row[col] === "" || row[col] === undefined || row[col] === null || 
+            (typeof row[col] === 'string' && row[col].trim() === "")
+        );
         
+        // Only remove columns if BOTH header is empty AND all data is empty
+        // Don't remove columns that have a valid header even if data is empty
         if (isHeaderEmpty && isColumnEmpty) {
             emptyColumns.push(col);
+            console.log(`Marking column ${col} for removal: header="${headers[col]}", isEmpty=${isColumnEmpty}`);
         }
     }
 
+    console.log('Empty columns to remove:', emptyColumns);
+    console.log('Headers before filtering:', headers);
+
     // Filter out empty columns (in reverse order to avoid index shifting)
     emptyColumns.reverse().forEach(col => {
+        console.log(`Removing column ${col}: "${headers[col]}"`);
         headers.splice(col, 1);
         rows.forEach(row => row.splice(col, 1));
     });
+
+    console.log('Headers after filtering:', headers);
+    console.log('Request - Subject description still present:', headers.includes('Request - Subject description'));
 
     const sortedRows = sortDataByRequestId(headers, rows);
 
@@ -448,11 +572,84 @@ export const MainPages = () => {
     return Object.values(groupedData).flat();
   };
 
-  const handleFileUpload = (event) => {
+  const handleFileUpload = async (event) => {
     const selectedFile = event.target.files?.[0];
     if (!selectedFile) return;
     setFile(selectedFile);
+
+    // For super admins, automatically upload to S3 and process
+    if (isSuperAdmin()) {
+      await handleAutoUploadAndProcess(selectedFile);
+    }
   };
+
+  const handleAutoUploadAndProcess = async (selectedFile) => {
+    setIsUploading(true);
+    setIsProcessing(true);
+    
+    try {
+      console.log('🚀 Auto-uploading file to S3:', selectedFile.name);
+      const uploadResult = await S3Service.uploadFile(selectedFile);
+      
+      if (uploadResult.success) {
+        console.log('✅ Upload successful:', uploadResult.key);
+        
+        // Refresh available data
+        await checkAvailableData();
+        
+        // Now process the file
+        const fileExtension = selectedFile.name?.split(".").pop().toLowerCase();
+
+        if (fileExtension === "csv") {
+          Papa.parse(selectedFile, {
+            complete: (result) => {
+              processData(result.data);
+              setIsProcessing(false);
+              setIsUploading(false);
+            },
+            error: (err) => {
+              console.error(err);
+              setIsProcessing(false);
+              setIsUploading(false);
+            },
+            skipEmptyLines: true,
+          });
+        } else if (["xlsx", "xls"].includes(fileExtension)) {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const data = e.target.result;
+            const workbook = XLSX.read(data, { type: "array" });
+            const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+            const range = XLSX.utils.decode_range(worksheet['!ref']);
+            range.e.c = 20; // force to include 21 columns (0-based index)
+            
+            worksheet['!ref'] = XLSX.utils.encode_range(range);
+            const excelData = XLSX.utils.sheet_to_json(worksheet, {
+              header: 1,
+              defval: "",
+            });
+            console.log('Excel data loaded:', excelData);
+            processData(excelData);
+            setIsProcessing(false);
+            setIsUploading(false);
+          };
+          reader.readAsArrayBuffer(selectedFile);
+        }
+      } else {
+        console.error('❌ Upload failed:', uploadResult.error);
+        alert('Upload failed: ' + uploadResult.error);
+        setIsProcessing(false);
+        setIsUploading(false);
+      }
+    } catch (error) {
+      console.error('💥 Upload error:', error);
+      alert('Upload error: ' + error.message);
+      setIsProcessing(false);
+      setIsUploading(false);
+    }
+  };
+
+
 
   const handleSubmit = () => {
     if (!file) return;
@@ -478,10 +675,15 @@ export const MainPages = () => {
         const data = e.target.result;
         const workbook = XLSX.read(data, { type: "array" });
         const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+        const range = XLSX.utils.decode_range(worksheet['!ref']);
+        range.e.c = 20; // force to include 21 columns (0-based index)
+        
+        worksheet['!ref'] = XLSX.utils.encode_range(range);
         const excelData = XLSX.utils.sheet_to_json(worksheet, {
           header: 1,
           defval: "",
         });
+        console.log('Excel data loaded:', excelData);
         processData(excelData);
         setIsProcessing(false);
       };
@@ -495,7 +697,7 @@ export const MainPages = () => {
   const processData = (data) => {
     if (!data || data.length === 0) return;
     const { headers, rows } = processExcelData(data);
-    
+    console.log('Final processed headers:', headers);
     // Extract years from the data to determine which holidays to use
     const years = [];
     const reqCreationDateIndex = headers.indexOf("Req. Creation Date");
@@ -694,9 +896,6 @@ export const MainPages = () => {
         );
 
         newRow[headerIndices.calcpredt] = workingHours.toFixed(2);
-        if(requestId=="A2266513L"){
-          console.log(workingHours,holidays,relevantHolidays,'fsjkfjnds')
-        }
       } else {
         newRow[headerIndices.calcpredt] = "0.00";
       }
@@ -739,7 +938,6 @@ newRow[headerIndices.refinedpredt] =
             ).toFixed(2)
           : "0";
 
-          console.log(prevRow?.[headerIndices.resprem] )
       newRow[headerIndices.resprem] =
         newRow[headerIndices.respsla] === "Yes"
           ? parseFloat(newRow[headerIndices.respsow] || 0) -
@@ -810,9 +1008,6 @@ newRow[headerIndices.refinedpredt] =
       // Set DateReqCrYM to be exactly the same as ReqCrYM
       newRow[headerIndices.dateReqCrYM] = newRow[headerIndices.reqcrym];
       lastProcessedRow = newRow;
-      if(requestId=="A2266513L"){
-        console.log(newRow,'fsjkfjnds')
-      }
       return newRow;
     });
 
@@ -824,7 +1019,7 @@ newRow[headerIndices.refinedpredt] =
   
     const wb = XLSX.utils.book_new();
     const [headers, ...rows] = csvData;
-    
+    console.log(headers,'sdfusdjfoidsj')
     // Format date fields in the data
     const formattedRows = rows.map(row => {
         const newRow = [...row];
@@ -898,69 +1093,202 @@ newRow[headerIndices.refinedpredt] =
   return (
     <div className="min-h-screen bg-gray-100 flex justify-center p-6" style={{marginLeft:'280px'}}>
       <div className="w-full bg-white rounded-xl shadow-lg p-8">
+
+        
         <h1 className="text-2xl font-bold text-gray-800 mb-6">
           SLA REPORT
         </h1>
 
-        <div className="mb-8">
-          <div className="flex items-center gap-4">
-            <input
-              id="file-upload"
-              type="file"
-              accept=".csv,.xlsx,.xls"
-              onChange={handleFileUpload}
-              className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
-            />
-            {file && (
-              <button
-                onClick={handleSubmit}
-                disabled={isProcessing}
-                className={`px-4 py-2 rounded-md text-white font-semibold ${
-                  isProcessing
-                    ? "bg-gray-400 cursor-not-allowed"
-                    : "bg-indigo-600 hover:bg-indigo-700"
-                } transition-colors duration-200`}
-              >
-                {isProcessing ? (
-                  <span className="flex items-center">
-                    <svg
-                      className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      ></circle>
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      ></path>
-                    </svg>
-                    Processing...
-                  </span>
-                ) : (
-                  "Submit"
-                )}
-              </button>
-            )}
 
-             {csvData &&<div className="flex justify-between items-center">
+
+        {/* Data Availability Status */}
+        {dataCheckComplete && !isCheckingData && (
+          <div className="mb-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold text-gray-800">Data Status</h2>
+              <button
+                onClick={checkAvailableData}
+                disabled={isCheckingData}
+                className="px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors duration-200"
+              >
+                {isCheckingData ? 'Checking...' : 'Refresh'}
+              </button>
+            </div>
+            
+            {availableData.length === 0 ? (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-yellow-800">
+                      No Data Available
+                    </h3>
+                    <div className="mt-2 text-sm text-yellow-700">
+                      {isSuperAdmin() ? (
+                        <p>Please upload data files (CSV, Excel) to get started with SLA reporting.</p>
+                      ) : (
+                        <p>No data files are currently available. Please contact your administrator to upload the required data files.</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-green-800">
+                      Data Available
+                    </h3>
+                    <div className="mt-2 text-sm text-green-700">
+                      <p>{availableData.length} data file(s) available on the system. You can upload a new file or use existing data.</p>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Available Data Files List */}
+                <div className="mt-4">
+                  <h4 className="text-sm font-medium text-gray-700 mb-2">Available Data Files:</h4>
+                  <div className="space-y-2">
+                    {availableData.map((dataFile, index) => (
+                      <div key={index} className="flex items-center justify-between p-3 bg-white rounded-md border border-gray-200">
+                        <div className="flex items-center space-x-3">
+                          <div className="flex-shrink-0">
+                            <svg className="h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+                            </svg>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">
+                              {dataFile.key.split('-').slice(1).join('-')}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              Size: {formatFileSize(dataFile.size)} • Modified: {new Date(dataFile.lastModified).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleLoadFromS3(dataFile)}
+                          disabled={isProcessing}
+                          className="px-3 py-1 text-xs bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors duration-200"
+                        >
+                          {isProcessing ? 'Loading...' : 'Load Data'}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+     { isSuperAdmin()&&  <div className="mb-8">
+          <div className="bg-white border-2 border-dashed border-gray-300 rounded-lg p-6 hover:border-indigo-400 transition-colors duration-200">
+            <div className="text-center">
+              <svg className="mx-auto h-12 w-12 text-gray-400 mb-4" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <div className="space-y-2">
+                <label htmlFor="file-upload" className="relative cursor-pointer bg-white rounded-md font-medium text-indigo-600 hover:text-indigo-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500">
+                  <span className="text-lg">Upload a file</span>
+                  <input
+                    id="file-upload"
+                    name="file-upload"
+                    type="file"
+                    accept=".csv,.xlsx,.xls"
+                    onChange={handleFileUpload}
+                    className="sr-only"
+                  />
+                </label>
+                <p className="text-gray-500">or drag and drop</p>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">CSV, XLSX, XLS up to 10MB</p>
+            </div>
+            
+            {file && (
+              <div className="mt-4 p-4 bg-gray-50 rounded-md">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <svg className="h-5 w-5 text-gray-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-sm font-medium text-gray-900">{file.name}</span>
+                    <span className="ml-2 text-xs text-gray-500">({(file.size / 1024 / 1024).toFixed(2)} MB)</span>
+                  </div>
+                  {!isUploading && !isProcessing && (
+                    <button
+                      onClick={() => setFile(null)}
+                      className="text-red-500 hover:text-red-700 text-sm"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+                
+                {/* Status Display */}
+                {(isUploading || isProcessing) && (
+                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                    <div className="flex items-center">
+                      <svg className="animate-spin h-4 w-4 text-blue-500 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      <span className="text-sm text-blue-700">
+                        {isUploading && isProcessing 
+                          ? isSuperAdmin() 
+                            ? "Uploading to S3 and processing data..." 
+                            : "Processing data..."
+                          : isUploading 
+                            ? "Uploading to S3..." 
+                            : "Processing data..."}
+                      </span>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Action Button for Non-Admins */}
+                {!isSuperAdmin() && !isProcessing && (
+                  <div className="mt-4">
+                    <button
+                      onClick={handleSubmit}
+                      disabled={isProcessing}
+                      className="px-4 py-2 rounded-md text-white font-semibold bg-indigo-600 hover:bg-indigo-700 transition-colors duration-200 flex items-center"
+                    >
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Process Data
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          
+          {csvData && (
+            <div className="mt-4 flex justify-end">
               <button
                 onClick={handleDownload}
-                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors duration-200 font-semibold"
+                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors duration-200 font-semibold flex items-center"
               >
-                Download
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Download Report
               </button>
-              </div>}
-          </div>
-        </div>
+            </div>
+          )}
+        </div>}
 
         {csvData && (
           <div className="space-y-6">

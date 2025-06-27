@@ -1,6 +1,5 @@
 import React from 'react';
 import Select from 'react-select';
-import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 
 const SharedFilters = ({ 
@@ -9,6 +8,7 @@ const SharedFilters = ({
   onResetFilters,
   getUniqueValues 
 }) => {
+  console.log(getUniqueValues('assignedTo'),'sdfsjdfndsoifdjs')
   return (
     <div className="filter-section">
       <div className="filter-grid">

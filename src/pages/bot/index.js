@@ -109,17 +109,18 @@ const Bot = () => {
   }, [messages]);
 
   return (
-    <div className="chat-container">
-      <div className="recent-chats">
-        <h3>Recent Chats</h3>
-        {recentChats.map((chat, index) => (
-          <div key={index} className="recent-chat-item">
-            <p><strong></strong> {chat.question}</p>
-            {/* <p><strong>A:</strong> {chat.answer}</p> */}
-          </div>
-        ))}
-      </div>
-      <div className="chat-window">
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+      <div className="chat-container" style={{ flex: 1, height: '100vh' }}>
+        <div className="recent-chats">
+          <h3>Recent Chats</h3>
+          {recentChats.map((chat, index) => (
+            <div key={index} className="recent-chat-item">
+              <p><strong></strong> {chat.question}</p>
+              {/* <p><strong>A:</strong> {chat.answer}</p> */}
+            </div>
+          ))}
+        </div>
+        <div className="chat-window">
         <div className="chat-messages">
         {messages.map((msg, index) => (
   <div
@@ -227,6 +228,7 @@ const Bot = () => {
               Selected file: {file.name}
             </div>
           )}
+        </div>
       </div>
     </div>
   );
