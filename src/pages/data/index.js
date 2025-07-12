@@ -332,20 +332,44 @@ export const MainPages = () => {
     checkAvailableData();
   }, []);
 
-  const checkAvailableData = async () => {
+  // Auto-load latest data file when available
+  useEffect(() => {
+    if (dataCheckComplete && availableData.length > 0 && !csvData) {
+      // Automatically load the latest file (first in the sorted array)
+      const latestFile = availableData[0];
+      console.log('🔄 Auto-loading latest data file:', latestFile.key);
+      handleLoadFromS3(latestFile);
+    }
+  }, [dataCheckComplete, availableData, csvData]);
+
+  const checkAvailableData = async (forceRefresh = false) => {
     setIsCheckingData(true);
     try {
+      if (forceRefresh) {
+        console.log('🔄 Force refreshing S3 data to check for overrides...');
+      }
       console.log('🔍 Checking for available data on S3...');
       const result = await S3Service.listFiles();
       if (result.success) {
-        // Filter for data files (CSV, Excel)
+        // Filter for data files (CSV, Excel) - files are already sorted by newest first
         const dataFiles = result.files.filter(file => {
           const extension = file.key.split('.').pop().toLowerCase();
           return ['csv', 'xlsx', 'xls'].includes(extension);
         });
         
-        console.log('📊 Found data files on S3:', dataFiles);
+        console.log('📊 Found data files on S3 (sorted by newest):', dataFiles);
         setAvailableData(dataFiles);
+        
+        // If there's a latest file and no data loaded yet, show message
+        if (dataFiles.length > 0) {
+          console.log('📁 Latest data file available:', dataFiles[0].key);
+          console.log('📅 Latest file modified:', dataFiles[0].lastModified);
+          console.log('🏷️ Latest file ETag:', dataFiles[0].etag);
+        }
+        
+        if (forceRefresh) {
+          console.log('✅ Force refresh completed - file list updated');
+        }
       } else {
         console.error('❌ Failed to check S3 data:', result.error);
         setAvailableData([]);
@@ -593,9 +617,14 @@ export const MainPages = () => {
       
       if (uploadResult.success) {
         console.log('✅ Upload successful:', uploadResult.key);
+        console.log('🔄 All previous files deleted, now showing only the latest upload');
         
-        // Refresh available data
-        await checkAvailableData();
+        // Add a small delay to ensure S3 processes the upload and deletions
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        // Force refresh available data to ensure we see only the new file
+        console.log('🔄 Force refreshing data list to confirm single file...');
+        await checkAvailableData(true);
         
         // Now process the file
         const fileExtension = selectedFile.name?.split(".").pop().toLowerCase();
@@ -1092,22 +1121,43 @@ newRow[headerIndices.refinedpredt] =
 
   return (
     <div className="min-h-screen bg-gray-100 flex justify-center p-6" style={{marginLeft:'280px'}}>
+      {/* Full Screen Loader Overlay */}
+      {(isCheckingData || isProcessing || isUploading) && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-8 flex flex-col items-center shadow-xl">
+            <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-500 border-t-transparent mb-4"></div>
+            <div className="text-center">
+              <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                {isCheckingData ? 'Checking for available data...' : 
+                 isUploading ? 'Uploading file...' : 
+                 'Processing data...'}
+              </h3>
+              <p className="text-gray-600 text-sm">
+                {isCheckingData ? 'Please wait while we check for the latest data files.' : 
+                 isUploading ? 'Your file is being uploaded and will be processed automatically.' : 
+                 'Your data is being processed. This may take a few moments.'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="w-full bg-white rounded-xl shadow-lg p-8">
 
-        
+{/*         
         <h1 className="text-2xl font-bold text-gray-800 mb-6">
           SLA REPORT
-        </h1>
+        </h1> */}
 
 
 
         {/* Data Availability Status */}
-        {dataCheckComplete && !isCheckingData && (
+        {isSuperAdmin()&& dataCheckComplete && !isCheckingData && (
           <div className="mb-6">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold text-gray-800">Data Status</h2>
+              <h2 className="text-lg font-semibold text-gray-800">File Status</h2>
               <button
-                onClick={checkAvailableData}
+                onClick={() => checkAvailableData(true)}
                 disabled={isCheckingData}
                 className="px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors duration-200"
               >
@@ -1139,25 +1189,11 @@ newRow[headerIndices.refinedpredt] =
               </div>
             ) : (
               <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                  <div className="ml-3">
-                    <h3 className="text-sm font-medium text-green-800">
-                      Data Available
-                    </h3>
-                    <div className="mt-2 text-sm text-green-700">
-                      <p>{availableData.length} data file(s) available on the system. You can upload a new file or use existing data.</p>
-                    </div>
-                  </div>
-                </div>
+           
                 
                 {/* Available Data Files List */}
                 <div className="mt-4">
-                  <h4 className="text-sm font-medium text-gray-700 mb-2">Available Data Files:</h4>
+                  <h4 className="text-sm font-medium text-gray-700 mb-2">Available Files:</h4>
                   <div className="space-y-2">
                     {availableData.map((dataFile, index) => (
                       <div key={index} className="flex items-center justify-between p-3 bg-white rounded-md border border-gray-200">
@@ -1169,7 +1205,7 @@ newRow[headerIndices.refinedpredt] =
                           </div>
                           <div>
                             <p className="text-sm font-medium text-gray-900">
-                              {dataFile.key.split('-').slice(1).join('-')}
+                              {dataFile.key}
                             </p>
                             <p className="text-xs text-gray-500">
                               Size: {formatFileSize(dataFile.size)} • Modified: {new Date(dataFile.lastModified).toLocaleDateString()}
@@ -1181,7 +1217,7 @@ newRow[headerIndices.refinedpredt] =
                           disabled={isProcessing}
                           className="px-3 py-1 text-xs bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors duration-200"
                         >
-                          {isProcessing ? 'Loading...' : 'Load Data'}
+                          {isProcessing ? 'Loading...' : 'Submit'}
                         </button>
                       </div>
                     ))}

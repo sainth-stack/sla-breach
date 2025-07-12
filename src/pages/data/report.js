@@ -121,11 +121,11 @@ const Report = ({ data }) => {
   if (!headerIndices) return <div>Loading report...</div>;
 
   return (
-    <div className="mx-auto p-6 bg-white rounded-lg shadow-md" style={{marginTop:'30px'}}>
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-800 mb-2">
+    <div className="mx-auto p-6 bg-white rounded-lg shadow-md" style={{}}>
+      <div className="">
+        {/* <h1 className="text-2xl font-bold text-gray-800 mb-2">
           {yearMonth ? `Report for the month of:` : "Complete Report"}
-        </h1>
+        </h1> */}
         <input
           type="text"
           value={yearMonth}

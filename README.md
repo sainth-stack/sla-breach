@@ -2,6 +2,26 @@
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
+## Environment Setup
+
+Before running the application, you need to set up environment variables for S3 file upload functionality.
+
+1. Create a `.env` file in the root directory
+2. Add the following variables:
+
+```bash
+REACT_APP_AWS_REGION=us-east-1
+REACT_APP_AWS_ACCESS_KEY_ID=your_access_key_id_here
+REACT_APP_AWS_SECRET_ACCESS_KEY=your_secret_access_key_here
+REACT_APP_S3_BUCKET_NAME=sla-breach-data
+```
+
+Replace the placeholder values with your actual AWS credentials.
+
+**Note**: The `.env` file is automatically ignored by git to prevent committing sensitive credentials.
+
+For detailed S3 setup instructions, see [S3_SETUP.md](./S3_SETUP.md).
+
 ## Available Scripts
 
 In the project directory, you can run:

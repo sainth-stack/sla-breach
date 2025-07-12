@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, GetObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand, ListObjectsV2Command, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 // AWS Configuration - Use environment variables for security
@@ -91,22 +91,99 @@ export class S3Service {
     return contentTypes[extension.toLowerCase()] || 'application/octet-stream';
   }
 
+  // Delete all existing data files to ensure only one file exists
+  static async deleteAllDataFiles() {
+    try {
+      console.log('🗑️ Deleting all existing data files to ensure only one file exists...');
+      
+      // First, list all files
+      const listResult = await this.listFiles();
+      if (!listResult.success) {
+        console.log('📂 No existing files to delete or failed to list files');
+        return { success: true, deletedCount: 0 };
+      }
+
+      // Filter for data files (CSV, Excel)
+      const dataFiles = listResult.files.filter(file => {
+        const extension = file.key.split('.').pop().toLowerCase();
+        return ['csv', 'xlsx', 'xls'].includes(extension);
+      });
+
+      if (dataFiles.length === 0) {
+        console.log('📂 No data files found to delete');
+        return { success: true, deletedCount: 0 };
+      }
+
+      console.log('🗑️ Found', dataFiles.length, 'data files to delete:', dataFiles.map(f => f.key));
+
+      // Delete all data files
+      const deletePromises = dataFiles.map(async (file) => {
+        try {
+          const command = new DeleteObjectCommand({
+            Bucket: S3_BUCKET_NAME,
+            Key: file.key,
+          });
+          
+          await s3Client.send(command);
+          console.log('✅ Deleted:', file.key);
+          return { success: true, key: file.key };
+        } catch (error) {
+          console.error('❌ Failed to delete:', file.key, error);
+          return { success: false, key: file.key, error: error.message };
+        }
+      });
+
+      const results = await Promise.all(deletePromises);
+      const successCount = results.filter(r => r.success).length;
+      const failCount = results.filter(r => !r.success).length;
+
+      console.log('🗑️ Deletion summary:', { total: dataFiles.length, success: successCount, failed: failCount });
+
+      return {
+        success: failCount === 0,
+        deletedCount: successCount,
+        failedCount: failCount,
+        results
+      };
+
+    } catch (error) {
+      console.error('💥 Error deleting data files:', error);
+      return {
+        success: false,
+        error: error.message,
+        deletedCount: 0
+      };
+    }
+  }
+
   // Upload file to S3
   static async uploadFile(file, fileName = null) {
     try {
-      // Preserve original file extension and name
+      // FIRST: Delete all existing data files to ensure only one file exists
+      console.log('🔄 Ensuring only one data file exists - deleting all previous files...');
+      const deleteResult = await this.deleteAllDataFiles();
+      
+      if (deleteResult.deletedCount > 0) {
+        console.log('✅ Successfully deleted', deleteResult.deletedCount, 'previous data files');
+      }
+
+      // Use original filename to maintain user's file naming
       const originalName = file.name;
       const fileExtension = originalName.split('.').pop();
-      const key = fileName || `${Date.now()}-${originalName}`;
       
-      console.log('🚀 Starting S3 upload:', { 
+      // Use original filename 
+      const key = fileName || originalName;
+      
+      console.log('🚀 Starting S3 upload (SINGLE FILE MODE):', { 
         fileName: originalName, 
         key, 
         size: file.size, 
         type: file.type,
         extension: fileExtension,
         bucket: S3_BUCKET_NAME,
-        region: AWS_REGION
+        region: AWS_REGION,
+        singleFileMode: true,
+        previousFilesDeleted: deleteResult.deletedCount
       });
       
       // Validate file
@@ -153,18 +230,25 @@ export class S3Service {
         },
       });
 
-      console.log('📤 Sending upload command to S3...');
+      console.log('📤 Sending upload command to S3 (SINGLE FILE MODE)...');
+      console.log('🎯 This is now the ONLY data file in the bucket');
       const result = await s3Client.send(command);
       
-      console.log('✅ S3 upload successful:', { 
+      console.log('✅ S3 upload successful (SINGLE FILE UPLOADED):', { 
         key, 
         etag: result.ETag, 
         url: `https://${S3_BUCKET_NAME}.s3.${AWS_REGION}.amazonaws.com/${key}`,
         fileSize: file.size,
         contentType: file.type,
         originalName: originalName,
-        requestId: result.$metadata?.requestId
+        requestId: result.$metadata?.requestId,
+        singleFileMode: true,
+        previousFilesDeleted: deleteResult.deletedCount,
+        versionId: result.VersionId || 'no-versioning'
       });
+      
+      // Confirm this is the only file
+      console.log('🎯 Upload complete - This is now the ONLY data file in S3');
       
       return {
         success: true,
@@ -172,7 +256,9 @@ export class S3Service {
         url: `https://${S3_BUCKET_NAME}.s3.${AWS_REGION}.amazonaws.com/${key}`,
         etag: result.ETag,
         originalName: originalName,
-        fileExtension: fileExtension
+        fileExtension: fileExtension,
+        singleFileMode: true,
+        previousFilesDeleted: deleteResult.deletedCount
       };
     } catch (error) {
       console.error('❌ Error uploading file to S3:', {
@@ -238,6 +324,8 @@ export class S3Service {
         Bucket: S3_BUCKET_NAME,
         Prefix: prefix,
         MaxKeys: 100,
+        // Add cache busting to ensure fresh results
+        RequestPayer: undefined,
       });
 
       const response = await s3Client.send(command);
@@ -247,11 +335,24 @@ export class S3Service {
         size: object.Size,
         lastModified: object.LastModified,
         url: `https://${S3_BUCKET_NAME}.s3.${AWS_REGION}.amazonaws.com/${object.Key}`,
+        etag: object.ETag, // Include ETag to track file versions
       })) || [];
+
+      // Sort files by last modified date (newest first) to show latest file first
+      files.sort((a, b) => new Date(b.lastModified) - new Date(a.lastModified));
+
+      console.log('📋 S3 files listed (sorted by newest first):', {
+        totalFiles: files.length,
+        latestFile: files[0]?.key || 'none',
+        latestFileDate: files[0]?.lastModified || 'none',
+        latestFileETag: files[0]?.etag || 'none',
+        allFiles: files.map(f => ({ name: f.key, modified: f.lastModified, etag: f.etag }))
+      });
 
       return {
         success: true,
         files,
+        latestFile: files[0] || null, // Return the latest file separately
       };
     } catch (error) {
       console.error('Error listing files:', error);
