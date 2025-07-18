@@ -5,28 +5,28 @@ import { useNavigate } from "react-router-dom";
 import { message } from "antd";
 import './index.css';
 
-// Hardcoded user data
+// Hardcoded user data with secure passwords
 const HARDCODED_USERS = [
-  { name: "Krishna Tirumala Reddy", email: "Krishna.tirumalareddy@seleccionconsulting.com", isSuperAdmin: true },
-  { name: "Battula Hima Sri", email: "hima.sri@seleccionconsulting.com" },
-  { name: "Das Mistoo", email: "mistoo.das@seleccionconsulting.com" },
-  { name: "Gopal Ravi", email: "ravi.gopal@seleccionconsulting.com" },
-  { name: "Jaleel Mohammed", email: "mohammedjaleel.shaik@seleccionconsulting.com" },
-  { name: "Kumari Antima", email: "antima.kumari@seleccionconsulting.com" },
-  { name: "Kuntal Patel", email: "kuntal.patel@seleccionconsulting.com" },
-  { name: "Menon Nivhin", email: "nivhin.menon@seleccionconsulting.com" },
-  { name: "Murugesan Venkatesan", email: "venkatesan.murugesan@seleccionconsulting.com" },
-  { name: "Narayanan Balaji", email: "balaji.narayanan@seleccionconsulting.com" },
-  { name: "NETKE AKSHAY", email: "akshay.netke@seleccionconsulting.com" },
-  { name: "Nookala Maheedhar", email: "maheedhar.nookala@seleccionconsulting.com" },
-  { name: "Patel Ankit", email: "ankit.patel@seleccionconsulting.com" },
-  { name: "SANDEEP SV Guru", email: "sandeep.sankavenkata@seleccionconsulting.com" },
-  { name: "Shatabdi Roy", email: "shatabdi.roy@seleccionconsulting.com" },
-  { name: "Sundarrajan Alagudurai", email: "alagudurai.s@seleccionconsulting.com" },
-  { name: "Tushar Adit", email: "adit.paleja@seleccionconsulting.com" },
-  { name: "URKUNDE Shubham", email: "shubham.urkunde@seleccionconsulting.com" },
-  { name: "Vasanthakumari Pradheepasokan", email: "pradheep.av@seleccionconsulting.com" },
-  { name: "Shubham Thube", email: "shubham.thube@seleccionconsulting.com" }
+  { name: "Krishna Tiruma Reddy", email: "krishna.tirumareddy@seleccionconsulting.com", password: "KTR#9p$mN2", isSuperAdmin: true },
+  { name: "Battula Hima Sri", email: "hima.sri@seleccionconsulting.com", password: "BHS@8k$vL5" },
+  { name: "Das Mistoo", email: "mistoo.das@seleccionconsulting.com", password: "DM#7j$xK9" },
+  { name: "Gopal Ravi", email: "ravi.gopal@seleccionconsulting.com", password: "GR#5h$wP3" },
+  { name: "Jaleel Mohammed", email: "mohammedjaleel.shaik@seleccionconsulting.com", password: "JM@4m$nQ7" },
+  { name: "Kumari Antima", email: "antima.kumari@seleccionconsulting.com", password: "KA#6t$yR8" },
+  { name: "Kuntal Patel", email: "kuntal.patel@seleccionconsulting.com", password: "KP@9s$bH4" },
+  { name: "Menon Nivhin", email: "nivhin.menon@seleccionconsulting.com", password: "MN#3f$cJ6" },
+  { name: "Murugesan Venkatesan", email: "venkatesan.murugesan@seleccionconsulting.com", password: "MV@7d$gL2" },
+  { name: "Narayanan Balaji", email: "balaji.narayanan@seleccionconsulting.com", password: "NB#4k$pH8" },
+  { name: "NETKE AKSHAY", email: "akshay.netke@seleccionconsulting.com", password: "NA@2m$vT5" },
+  { name: "Nookala Maheedhar", email: "maheedhar.nookala@seleccionconsulting.com", password: "NM#8h$bR3" },
+  { name: "Patel Ankit", email: "ankit.patel@seleccionconsulting.com", password: "PA@5j$nW7" },
+  { name: "SANDEEP SV Guru", email: "sandeep.sankavenkata@seleccionconsulting.com", password: "SS#6f$mK9" },
+  { name: "Shatabdi Roy", email: "shatabdi.roy@seleccionconsulting.com", password: "SR@3h$pL4" },
+  { name: "Sundarrajan Alagudurai", email: "alagudurai.s@seleccionconsulting.com", password: "SA#7k$tQ2" },
+  { name: "Tushar Adit", email: "adit.paleja@seleccionconsulting.com", password: "TA@4n$wH6" },
+  { name: "URKUNDE Shubham", email: "shubham.urkunde@seleccionconsulting.com", password: "US#9m$cR5" },
+  { name: "Vasanthakumari Pradheepasokan", email: "pradheep.av@seleccionconsulting.com", password: "VP@2s$jL8" },
+  { name: "Shubham Thube", email: "shubham.thube@seleccionconsulting.com", password: "ST#5f$bK7" }
 ];
 
 export const Login = () => {
@@ -41,17 +41,10 @@ export const Login = () => {
     event.preventDefault();
     setLoading(true);
 
-    // Check password first
-    if (password !== 'Test@123') {
-      message.error('Invalid password. Please use: Test@123');
-      setLoading(false);
-      return;
-    }
-
     // Find user by email
     const user = HARDCODED_USERS.find(u => u.email.toLowerCase() === email.toLowerCase());
     
-    if (user) {
+    if (user && user.password === password) {
       // Store user data in localStorage
       const userData = {
         email: user.email,
@@ -72,7 +65,7 @@ export const Login = () => {
         navigate('/');
       }, 500);
     } else {
-      message.error('Invalid email address. Please check your email.');
+      message.error('Invalid email or password. Please check your credentials.');
     }
     
     setLoading(false);
