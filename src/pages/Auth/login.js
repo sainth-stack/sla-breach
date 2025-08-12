@@ -7,6 +7,7 @@ import './index.css';
 
 // Hardcoded user data with secure passwords
 const HARDCODED_USERS = [
+  { name: "Admin", email: "admin@gmail.com", password: "Test@123", isSuperAdmin: true },
   { name: "Krishna Tiruma Reddy", email: "krishna.tirumareddy@seleccionconsulting.com", password: "KTR#9p$mN2", isSuperAdmin: true },
   { name: "Battula Hima Sri", email: "hima.sri@seleccionconsulting.com", password: "BHS@8k$vL5" },
   { name: "Das Mistoo", email: "mistoo.das@seleccionconsulting.com", password: "DM#7j$xK9" },

@@ -5,6 +5,7 @@ import Bot from "./pages/bot";
 import {AdminLayout} from './layout'
 import HolidayList from "./pages/data/holiday-list";
 import { Login } from "./pages/Auth/login";
+// import SharePoint from "./pages/share-point";
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
                <Route path="/" element={<MainPages />} />
                <Route path="/bot" element={<Bot />} />
                <Route path="/holiday-list" element={<HolidayList />} />
+               {/* <Route path="/share-point" element={<SharePoint />} /> */}
                {/* <Route path="/login" element={<Login />} /> */}
         </Route>
         </Routes>

@@ -3,7 +3,7 @@ import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import Report from "./report";
 import { isSuperAdmin } from "../../utils/auth";
-import S3Service from "../../utils/s3Service";
+import api from "../../const";
 
 // Constants
 const YELLOW_FIELDS = [
@@ -321,65 +321,635 @@ export const MainPages = () => {
   const [file, setFile] = useState(null);
   const [csvData, setCsvData] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [availableData, setAvailableData] = useState([]);
+  const [availableData, setAvailableData] = useState({ input: [], output: [] });
   const [isCheckingData, setIsCheckingData] = useState(true);
   const [dataCheckComplete, setDataCheckComplete] = useState(false);
   const [holidays, setHolidays] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [lastProcessedFile, setLastProcessedFile] = useState(null);
+  const [backgroundServiceStatus, setBackgroundServiceStatus] = useState('idle');
+  const [processedFiles, setProcessedFiles] = useState(() => {
+    try {
+      const stored = localStorage.getItem('sla_processed_files');
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
 
-  // Check for available data on S3 when component loads
+  // Check for available data via backend SharePoint when component loads
   useEffect(() => {
     checkAvailableData();
+    startBackgroundService();
+    
+    // Cleanup interval on unmount
+    return () => {
+      if (window.backgroundServiceInterval) {
+        clearInterval(window.backgroundServiceInterval);
+      }
+    };
   }, []);
+
+  // Persist processed files to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('sla_processed_files', JSON.stringify([...processedFiles]));
+    } catch (error) {
+      console.warn('Failed to save processed files to localStorage:', error);
+    }
+  }, [processedFiles]);
 
   // Auto-load latest data file when available
   useEffect(() => {
-    if (dataCheckComplete && availableData.length > 0 && !csvData) {
+    if (dataCheckComplete && availableData.input && availableData.input.length > 0 && !csvData) {
       // Automatically load the latest file (first in the sorted array)
-      const latestFile = availableData[0];
-      console.log('🔄 Auto-loading latest data file:', latestFile.key);
-      handleLoadFromS3(latestFile);
+      const latestFile = availableData.input[0];
+      console.log('🔄 Auto-loading latest data file:', latestFile.name);
+      // handleLoadFromS3(latestFile);
     }
   }, [dataCheckComplete, availableData, csvData]);
 
   const checkAvailableData = async (forceRefresh = false) => {
     setIsCheckingData(true);
     try {
-      if (forceRefresh) {
-        console.log('🔄 Force refreshing S3 data to check for overrides...');
-      }
-      console.log('🔍 Checking for available data on S3...');
-      const result = await S3Service.listFiles();
-      if (result.success) {
-        // Filter for data files (CSV, Excel) - files are already sorted by newest first
-        const dataFiles = result.files.filter(file => {
-          const extension = file.key.split('.').pop().toLowerCase();
-          return ['csv', 'xlsx', 'xls'].includes(extension);
-        });
-        
-        console.log('📊 Found data files on S3 (sorted by newest):', dataFiles);
-        setAvailableData(dataFiles);
-        
-        // If there's a latest file and no data loaded yet, show message
-        if (dataFiles.length > 0) {
-          console.log('📁 Latest data file available:', dataFiles[0].key);
-          console.log('📅 Latest file modified:', dataFiles[0].lastModified);
-          console.log('🏷️ Latest file ETag:', dataFiles[0].etag);
-        }
-        
-        if (forceRefresh) {
-          console.log('✅ Force refresh completed - file list updated');
-        }
-      } else {
-        console.error('❌ Failed to check S3 data:', result.error);
-        setAvailableData([]);
-      }
+      if (forceRefresh) console.log('🔄 Force refreshing SharePoint list...');
+      const { data } = await api.get('/api/sharepoint/all_files');
+      const inputItems = (data?.input?.items || []).filter(item => {
+        const name = (item?.name || '').toLowerCase();
+        return name.endsWith('.csv') || name.endsWith('.xlsx') || name.endsWith('.xls');
+      });
+      const outputItems = (data?.output?.items || []).filter(item => {
+        const name = (item?.name || '').toLowerCase();
+        return name.endsWith('.csv') || name.endsWith('.xlsx') || name.endsWith('.xls');
+      });
+      
+      // Sort newest first by lastModifiedDateTime if available
+      inputItems.sort((a,b) => new Date(b.lastModifiedDateTime || 0) - new Date(a.lastModifiedDateTime || 0));
+      outputItems.sort((a,b) => new Date(b.lastModifiedDateTime || 0) - new Date(a.lastModifiedDateTime || 0));
+      
+      setAvailableData({
+        input: inputItems,
+        output: outputItems
+      });
     } catch (error) {
-      console.error('💥 Error checking S3 data:', error);
-      setAvailableData([]);
+      console.error('💥 Error checking SharePoint:', error);
+      setAvailableData({ input: [], output: [] });
     } finally {
       setIsCheckingData(false);
       setDataCheckComplete(true);
+    }
+  };
+
+  // Background service to check for new files every 10 minutes
+  const startBackgroundService = () => {
+    console.log('🚀 Starting background service...');
+    setBackgroundServiceStatus('running');
+    
+    // Clear any existing interval
+    if (window.backgroundServiceInterval) {
+      clearInterval(window.backgroundServiceInterval);
+    }
+    
+    // Run immediately once
+    processLatestFile();
+    
+    // Then run every 10 minutes (600,000 ms)
+    window.backgroundServiceInterval = setInterval(() => {
+      console.log('⏰ Background service: Checking for new files...');
+      processLatestFile();
+    }, 10 * 60 * 1000);
+  };
+
+  const processLatestFile = async () => {
+    try {
+      setBackgroundServiceStatus('checking');
+      console.log('🔍 Checking for latest file...');
+      
+      const { data } = await api.get('/api/sharepoint/input_files');
+      const files = (data?.files || []).filter(item => {
+        const name = (item?.name || '').toLowerCase();
+        return name.endsWith('.csv') || name.endsWith('.xlsx') || name.endsWith('.xls');
+      });
+      
+      if (files.length === 0) {
+        console.log('📁 No files found');
+        setBackgroundServiceStatus('running');
+        return;
+      }
+      
+      // Sort by lastModifiedDateTime to get the latest
+      files.sort((a,b) => new Date(b.lastModifiedDateTime || 0) - new Date(a.lastModifiedDateTime || 0));
+      const latestFile = files[0];
+      
+      // Check if we've already processed this file
+      const fileKey = `${latestFile.id}_${latestFile.lastModifiedDateTime}`;
+      if (processedFiles.has(fileKey)) {
+        console.log('✅ Latest file already processed:', latestFile.name);
+        setBackgroundServiceStatus('running');
+        return;
+      }
+      
+      console.log('🆕 New file found, processing:', latestFile.name);
+      setBackgroundServiceStatus('processing');
+      
+      // Download and process the file
+      await downloadAndProcessFile(latestFile);
+      
+      // Mark as processed
+      setProcessedFiles(prev => new Set(prev).add(fileKey));
+      setLastProcessedFile(latestFile);
+      
+      console.log('✅ File processed successfully:', latestFile.name);
+      setBackgroundServiceStatus('running');
+      
+    } catch (error) {
+      console.error('❌ Error in background processing:', error);
+      setBackgroundServiceStatus('error');
+      // Reset to running after 1 minute
+      setTimeout(() => setBackgroundServiceStatus('running'), 60000);
+    }
+  };
+
+  const downloadAndProcessFile = async (file) => {
+    try {
+      if (!file['@microsoft.graph.downloadUrl']) {
+        throw new Error('No download URL available for file');
+      }
+      
+      console.log('⬇️ Downloading file:', file.name);
+      const response = await fetch(file['@microsoft.graph.downloadUrl']);
+      if (!response.ok) {
+        throw new Error(`Failed to download file: ${response.statusText}`);
+      }
+      
+      const blob = await response.blob();
+      const fileExtension = file.name.split('.').pop().toLowerCase();
+      
+      console.log('🔄 Processing file data...');
+      
+      if (fileExtension === 'csv') {
+        return new Promise((resolve, reject) => {
+          Papa.parse(blob, {
+            complete: async (result) => {
+              try {
+                const processedData = await processFileData(result.data);
+                await uploadProcessedFile(processedData, file.name);
+                resolve(processedData);
+              } catch (error) {
+                reject(error);
+              }
+            },
+            error: reject,
+            skipEmptyLines: true,
+          });
+        });
+      } else if (['xlsx', 'xls'].includes(fileExtension)) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = async (e) => {
+            try {
+              const data = e.target.result;
+              const workbook = XLSX.read(data, { type: "array" });
+              const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+              const range = XLSX.utils.decode_range(worksheet['!ref']);
+              range.e.c = 20;
+              worksheet['!ref'] = XLSX.utils.encode_range(range);
+              const excelData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
+              
+              const processedData = await processFileData(excelData);
+              await uploadProcessedFile(processedData, file.name);
+              resolve(processedData);
+            } catch (error) {
+              reject(error);
+            }
+          };
+          reader.onerror = reject;
+          reader.readAsArrayBuffer(blob);
+        });
+      } else {
+        throw new Error(`Unsupported file type: ${fileExtension}`);
+      }
+    } catch (error) {
+      console.error('💥 Error downloading/processing file:', error);
+      throw error;
+    }
+  };
+
+  const processFileData = async (data) => {
+    if (!data || data.length === 0) throw new Error('No data to process');
+    
+    const { headers, rows } = processExcelData(data);
+    
+    // Extract years from the data to determine which holidays to use
+    const years = [];
+    const reqCreationDateIndex = headers.indexOf("Req. Creation Date");
+    const historicalChangeDateIndex = headers.indexOf("Historical Status - Change Date");
+    
+    rows.forEach(row => {
+      // Extract year from creation date
+      if (reqCreationDateIndex !== -1 && row[reqCreationDateIndex]) {
+        const dateParts = row[reqCreationDateIndex].split('/');
+        if (dateParts.length === 3) {
+          years.push(dateParts[2]);
+        }
+      }
+      
+      // Extract year from change date
+      if (historicalChangeDateIndex !== -1 && row[historicalChangeDateIndex]) {
+        const dateParts = row[historicalChangeDateIndex].split('/');
+        if (dateParts.length === 3) {
+          years.push(dateParts[2]);
+        }
+      }
+    });
+    
+    // Get holidays for all years present in the data
+    const relevantHolidays = getHolidaysForYears(years);
+
+    const headerIndices = {
+      reqCreationDate: headers.indexOf("Req. Creation Date"),
+      creationTime: headers.indexOf("Creation Time"),
+      historicalStatusFrom: headers.indexOf("Historical Status - Status From"),
+      requestId: headers.indexOf("Request - ID"),
+      historicalStatusTo: headers.indexOf("Historical Status - Status To"),
+      reqStatusDescription: headers.indexOf("Req. Status - Description"),
+      historicalChangeDate: headers.indexOf("Historical Status - Change Date"),
+      historicalChangeTime: headers.indexOf("Historical Status - Change Time"),
+      priorityDescription: headers.indexOf("Request - Priority Description"),
+      reqClosingDate: headers.indexOf("Req. Closing Date"),
+      reqTypeDescription: headers.indexOf("Req. Type - Description EN"),
+    };
+
+    YELLOW_FIELDS.forEach((field) => {
+      if (!headers.includes(field)) {
+        headers.push(field);
+        headerIndices[field.toLowerCase()] = headers.length - 1;
+      } else {
+        headerIndices[field.toLowerCase()] = headers.indexOf(field);
+      }
+    });
+
+    const firstPassRows = rows.map((row, index) => {
+      const newRow = [...row];
+      while (newRow.length < headers.length) newRow.push("");
+
+      const statusFrom = (newRow[headerIndices.historicalStatusFrom] || "")
+        .toString()
+        .trim();
+      const statusTo = (newRow[headerIndices.historicalStatusTo] || "")
+        .toString()
+        .trim();
+      const requestId = newRow[headerIndices.requestId];
+      const priority = (newRow[headerIndices.priorityDescription] || "P4 - Low")
+        .toString()
+        .trim();
+      const priorityLevel = priority?.split(" ")[0];
+      const creationDateVal = newRow[headerIndices.reqCreationDate];
+      const creationTime = newRow[headerIndices.creationTime];
+      const changeDateVal = newRow[headerIndices.historicalChangeDate];
+      const changeTime = newRow[headerIndices.historicalChangeTime];
+      const reqStatusDescription = (
+        newRow[headerIndices.reqStatusDescription] || ""
+      )
+      const reqTypeDescription = (
+        newRow[headerIndices.reqTypeDescription] || ""
+      )
+        .toString()
+        .trim();
+
+      const creationDateTime = dateUtils.parseDateTime(
+        creationDateVal,
+        creationTime
+      );
+      const changeDateTime = dateUtils.parseDateTime(changeDateVal, changeTime, index);
+
+      const creationDate = creationDateTime ? new Date(creationDateTime) : null;
+      const changeDate = changeDateTime ? new Date(changeDateTime) : null;
+
+      const allowedStatusesTo = [
+        "Work in progress", "Forwarded", "Assigned", 
+        "Solved", "Suspended", "Pending for IT check","Awaiting external provider"
+      ];
+      const excludedStatusesFrom = [
+        "Suspended", "Pending for IT check", 
+        "Awaiting external provider"
+      ];
+      
+      // Normalize comparison
+      const isAllowedTo = allowedStatusesTo.some(
+        s => s.toLowerCase() === statusTo.trim().toLowerCase()
+      );
+      const isExcludedFrom = excludedStatusesFrom.some(
+        s => s.toLowerCase() === statusFrom.trim().toLowerCase()
+      );
+      
+      newRow[headerIndices.resolsla] = 
+        isAllowedTo && !isExcludedFrom ? "Yes" : " ";
+
+      newRow[headerIndices.respsla] =
+        index === 0 || requestId !== rows[index - 1]?.[headerIndices.requestId]
+          ? "Yes"
+          : " ";
+
+      newRow[headerIndices.reqcrdtconc] =
+        newRow[headerIndices.respsla] === "Yes" && creationDateTime
+          ? `${dateUtils.formatDate(creationDate)} ${dateUtils.formatTime(
+              creationTime
+            )}`
+          : " ";
+
+      newRow[headerIndices.endtconc] = dateUtils.formatTime(changeTime);
+
+      newRow[headerIndices.hischdtticonc] = changeDateTime
+        ? `${dateUtils.formatDate(changeDate)} ${dateUtils.formatTime(
+            changeTime
+          )}`
+        : " ";
+
+      newRow[headerIndices.resolsow] = SLA_TABLE[priorityLevel]?.resolsow || 90;
+      newRow[headerIndices.respsow] = SLA_TABLE[priorityLevel]?.respsow || 18;
+
+      return newRow;
+    });
+
+    let lastProcessedRow = null;
+
+    const processedRows = firstPassRows.map((row, index) => {
+      const newRow = [...row];
+      const requestId = newRow[headerIndices.requestId];
+      const prevRow = index > 0 ? lastProcessedRow : null;
+      const nextRow =
+        index < firstPassRows.length - 1 ? firstPassRows[index + 1] : null;
+      const prevRequestId = prevRow ? prevRow[headerIndices.requestId] : null;
+      const nextRequestId = nextRow ? nextRow[headerIndices.requestId] : null;
+      const statusTo = (newRow[headerIndices.historicalStatusTo] || "").toString().trim();
+
+      if (
+        newRow[headerIndices.resolsla] === "Yes" &&
+        newRow[headerIndices.reqcrdtconc] &&
+        newRow[headerIndices.hischdtticonc]
+      ) {
+        const startDate = parseCustomDate(newRow[headerIndices.reqcrdtconc]);
+        const endDate = parseCustomDate(
+          newRow[headerIndices.hischdtticonc] ||
+            new Date().toLocaleString("en-GB")
+        );
+
+        const workingHours = calculationUtils.calculatePreDt(
+          startDate,
+          endDate,
+          WORK_HOURS.start,
+          WORK_HOURS.end,
+          relevantHolidays,
+          index
+        );
+
+        newRow[headerIndices.calcstdt] = workingHours.toFixed(2);
+      } else {
+        newRow[headerIndices.calcstdt] = "0";
+      }
+
+      newRow[headerIndices.refinedstdt] =
+      parseFloat(newRow[headerIndices.calcstdt] || 0) < 0 ||
+      (newRow[headerIndices.reqTypeDescription] || "").toString().trim() === "Service Request" ||
+      relevantHolidays.includes(convertToISODate(newRow[headerIndices.historicalChangeDate]))
+        ? "0"
+        : newRow[headerIndices.calcstdt];
+        
+      if (
+        newRow[headerIndices.respsla] !== "Yes" &&
+        requestId === prevRequestId &&
+        prevRow?.[headerIndices.hischdtticonc]
+      ) {
+        const startDate = parseCustomDate(prevRow[headerIndices.hischdtticonc]);
+        const endDate = parseCustomDate(
+          newRow[headerIndices.hischdtticonc] ||
+            new Date().toLocaleString("en-GB")
+        );
+
+        const workingHours = calculationUtils.calculatePreDt(
+          startDate,
+          endDate,
+          WORK_HOURS.start,
+          WORK_HOURS.end,
+          relevantHolidays,
+          index
+        );
+
+        newRow[headerIndices.calcpredt] = workingHours.toFixed(2);
+      } else {
+        newRow[headerIndices.calcpredt] = "0.00";
+      }
+
+      newRow[headerIndices.reqcomp] = 
+      (statusTo === "Closed" || statusTo === "Discarded") 
+        ? "End" 
+        : (nextRow && requestId !== nextRequestId)
+          ? "Open" 
+          : " ";
+
+      newRow[headerIndices.refinedpredt] =
+        parseFloat(newRow[headerIndices.calcpredt] || 0) < 0 ||
+        (newRow[headerIndices.reqTypeDescription] || "").toString().trim() === "Service Request" ||
+        relevantHolidays.includes(convertToISODate(newRow[headerIndices.historicalChangeDate]))
+          ? "0"
+          : newRow[headerIndices.calcpredt];
+
+      newRow[headerIndices.elapsedtime] = (
+        newRow[headerIndices.resolsla] === "Yes" &&
+        (newRow[headerIndices.respsla] === " " || newRow[headerIndices.respsla] === " ")
+          ? parseFloat(newRow[headerIndices.refinedpredt] || 0)
+          : parseFloat(newRow[headerIndices.refinedstdt] || 0)
+      ).toFixed(2);
+
+      let cumulativeHours = 0;
+      if (requestId === prevRequestId) {
+        cumulativeHours = parseFloat(prevRow[headerIndices.cumilative] || 0);
+      }
+      cumulativeHours += parseFloat(newRow[headerIndices.elapsedtime] || 0);
+      newRow[headerIndices.cumilative] =
+        cumulativeHours > 0 ? cumulativeHours.toFixed(2) : "0.00";
+
+      newRow[headerIndices.resolrem] =
+        requestId !== nextRequestId
+          ? (
+              parseFloat(newRow[headerIndices.resolsow]) -
+              parseFloat(newRow[headerIndices.cumilative] || 0)
+            ).toFixed(2)
+          : "0";
+
+      newRow[headerIndices.resprem] =
+        newRow[headerIndices.respsla] === "Yes"
+          ? parseFloat(newRow[headerIndices.respsow] || 0) -
+            parseFloat(newRow[headerIndices.calcstdt] || 0)
+          : (Number(prevRow?.[headerIndices.resprem]) || 0);
+      newRow[headerIndices.resprem] = (newRow[headerIndices.resprem]||0)?.toFixed(2);
+
+      if (requestId === nextRequestId) {
+        newRow[headerIndices.rollover] = "2000 01";
+      } else if (
+        !["Closed", "Discarded"].includes(
+          newRow[headerIndices.reqStatusDescription]
+        )
+      ) {
+        const today = new Date();
+        newRow[headerIndices.rollover] = `${today.getFullYear()} ${String(
+          today.getMonth() + 1
+        ).padStart(2, "0")}`;
+      } else {
+        let changeDate;
+        try {
+          const [datePart, timePart] =
+            newRow[headerIndices.hischdtticonc].split(" ");
+          const [month,day, year] = datePart.split("/").map(Number);
+          changeDate = new Date(year, month - 1, day);
+        } catch (error) {
+          changeDate = null;
+        }
+
+        newRow[headerIndices.rollover] =
+          changeDate && !isNaN(changeDate.getTime())
+            ? `${changeDate.getFullYear()} ${String(
+                changeDate.getMonth() + 1
+              ).padStart(2, "0")}`
+            : " ";
+      }
+
+      const currentRollover = newRow[headerIndices.rollover];
+      newRow[headerIndices.dateRollover] = currentRollover;
+      newRow[headerIndices.reqcrym] =
+        currentRollover && currentRollover.trim() !== ""
+          ? newRow[headerIndices.reqCreationDate]
+            ? (() => {
+                let creationDate;
+                try {
+                  const [day,month, year] = newRow[
+                    headerIndices.reqCreationDate
+                  ]
+                    .split("/")
+                    .map(Number);
+                  creationDate = new Date(year, month - 1, day);
+                  if (isNaN(creationDate.getTime())) {
+                    return " ";
+                  }
+                  return `${creationDate.getFullYear()} ${String(
+                    creationDate.getMonth() + 1
+                  ).padStart(2, "0")}`;
+                } catch (error) {
+                  return " ";
+                }
+              })()
+            : " "
+          : "9999 12";
+
+      newRow[headerIndices.dateReqCrYM] = newRow[headerIndices.reqCreationDate];
+      newRow[headerIndices.dateRollover] = newRow[headerIndices.rollover];
+
+      // Set DateReqCrYM to be exactly the same as ReqCrYM
+      newRow[headerIndices.dateReqCrYM] = newRow[headerIndices.reqcrym];
+      lastProcessedRow = newRow;
+      return newRow;
+    });
+
+    return [headers, ...processedRows];
+  };
+
+  const uploadProcessedFile = async (processedData, originalFileName) => {
+    try {
+      console.log('📤 Uploading processed file to SharePoint...');
+      
+      const wb = XLSX.utils.book_new();
+      const [headers, ...rows] = processedData;
+      
+      // Format date fields in the data
+      const formattedRows = rows.map(row => {
+          const newRow = [...row];
+          const dateIndexes = [0, 7];
+          const changeTimeIndex = headers.indexOf("Historical Status - Change Time");
+          if (changeTimeIndex !== -1 && newRow[changeTimeIndex]) {
+              const timeStr = newRow[changeTimeIndex].toString().padStart(6, '0');
+              newRow[changeTimeIndex] = `${timeStr.slice(0, 2)}:${timeStr.slice(2, 4)}:${timeStr.slice(4, 6)}`;
+          }
+          
+          dateIndexes.forEach(index => {
+              if (newRow[index]) {
+                  // If it's a date string in format "dd/mm/yyyy"
+                  if (typeof newRow[index] === 'string' && newRow[index].match(/^\d{2}\/\d{2}\/\d{4}$/)) {
+                      const [dd, mm, yyyy] = newRow[index].split('/');
+                      newRow[index] = `${mm}/${dd}/${yyyy}`;
+                  }
+                  // If it's an Excel date number (like 45419)
+                  else if (typeof newRow[index] === 'number') {
+                      const date = XLSX.SSF.parse_date_code(newRow[index]);
+                      newRow[index] = `${(date.m).toString().padStart(2, '0')}/${(date.d).toString().padStart(2, '0')}/${date.y}`;
+                  }
+                  // If it's a datetime string like "04/01/2024 01:45:31"
+                  else if (typeof newRow[index] === 'string' && newRow[index].match(/^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}:\d{2}$/)) {
+                      const [datePart] = newRow[index].split(' ');
+                      const [dd, mm, yyyy] = datePart.split('/');
+                      newRow[index] = `${mm}/${dd}/${yyyy}`;
+                  }
+              }
+          });
+          return newRow;
+      });
+
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...formattedRows]);
+    
+      const HIGHLIGHT_FIELDS = [
+        "ResolSLA", "RespSLA", "ReqComp", "ReqCrDtConc", "EnDtConc", 
+        "HisChDtTiConc", "ElapsedTime", "CalcPreDt", "RefinedPreDt", 
+        "CalcStDt", "RefinedStDt", "Cumilative", "ResolSOW", "RespSOW", 
+        "ResolRem", "RespRem", "Rollover", "ReqCrYM", "DateRollover", "DateReqCrYM"
+      ];
+    
+      const highlightCols = headers.reduce((acc, header, idx) => {
+        if (HIGHLIGHT_FIELDS.includes(header)) acc[idx] = true;
+        return acc;
+      }, {});
+      
+      Object.keys(ws).forEach(key => {
+        if (key !== '!ref') {
+          const col = XLSX.utils.decode_cell(key).c;
+          if (highlightCols[col]) {
+            ws[key].s = {
+              fill: { 
+                patternType: "solid", 
+                fgColor: { rgb: "ADD8E6" } // Light blue color
+              },
+              font: { 
+                bold: XLSX.utils.decode_cell(key).r === 0 // Bold for header row
+              }
+            };
+          }
+        }
+      });
+    
+      XLSX.utils.book_append_sheet(wb, ws, "ProcessedData");
+      
+      // Generate filename with current date in sla_report_YYYYMMDD.xlsx format
+      const currentDate = new Date().toISOString().split('T')[0].replace(/-/g, '');
+      const filename = `sla_report_${currentDate}.xlsx`;
+      
+      // Convert workbook to buffer
+      const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+      const file = new File([buffer], filename, {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      });
+      
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const uploadResponse = await api.post('/api/sharepoint/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      
+      console.log('✅ Processed file uploaded to SharePoint successfully:', uploadResponse.data);
+      return uploadResponse.data;
+      
+    } catch (error) {
+      console.error('❌ Error uploading processed file to SharePoint:', error);
+      throw error;
     }
   };
 
@@ -392,71 +962,36 @@ export const MainPages = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  // Function to load data from S3
-  const handleLoadFromS3 = async (dataFile) => {
+  // Function to download file from SharePoint
+  const handleDownloadFile = async (file, folderType) => {
     try {
-      console.log('📥 Loading data from S3:', dataFile.key);
-      setIsProcessing(true);
+      console.log(`🔽 Downloading ${folderType} file:`, file.name);
       
-      const result = await S3Service.downloadFile(dataFile.key);
-      if (result.success) {
-        // Convert blob to file-like object
-        const file = new File([result.blob], dataFile.key.split('-').slice(1).join('-'), {
-          type: result.contentType
-        });
-        
-        console.log('✅ Successfully loaded file from S3:', file.name);
-        setFile(file);
-        
-        // Determine file type and process accordingly
-        const fileExtension = file.name?.split(".").pop().toLowerCase();
-        
-        if (fileExtension === "csv") {
-          Papa.parse(file, {
-            complete: (result) => {
-              processData(result.data);
-              setIsProcessing(false);
-            },
-            error: (err) => {
-              console.error(err);
-              setIsProcessing(false);
-            },
-            skipEmptyLines: true,
-          });
-        } else if (["xlsx", "xls"].includes(fileExtension)) {
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            const data = e.target.result;
-            const workbook = XLSX.read(data, { type: "array" });
-            const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-            const range = XLSX.utils.decode_range(worksheet['!ref']);
-            range.e.c = 20; // force to include 21 columns (0-based index)
-            
-            worksheet['!ref'] = XLSX.utils.encode_range(range);
-            const excelData = XLSX.utils.sheet_to_json(worksheet, {
-              header: 1,
-              defval: "",
-            });
-            console.log('Excel data loaded from S3:', excelData);
-            processData(excelData);
-            setIsProcessing(false);
-          };
-          reader.readAsArrayBuffer(file);
-        } else {
-          console.error("Unsupported file type");
-          setIsProcessing(false);
-        }
-        
-      } else {
-        console.error('❌ Failed to load file from S3:', result.error);
-        alert('Failed to load file from S3: ' + result.error);
-        setIsProcessing(false);
-      }
+      const response = await api.get(`/api/sharepoint/download/${folderType}/${file.id}`, {
+        responseType: 'blob'
+      });
+      
+      // Create blob URL and trigger download
+      const blob = new Blob([response.data]);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = file.name;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      console.log('✅ File downloaded successfully:', file.name);
     } catch (error) {
-      console.error('💥 Error loading from S3:', error);
-      alert('Error loading file: ' + error.message);
-      setIsProcessing(false);
+      console.error('❌ Error downloading file:', error);
+      alert('Failed to download file. Please try again.');
     }
+  };
+
+  // Function to show files available from SharePoint
+  const handleShowAvailableFiles = () => {
+    alert('Files are listed below. Use manual upload to process locally or use the background automation for SharePoint processing.');
   };
 
   const getHolidaysForYears = (years) => {
@@ -608,73 +1143,40 @@ export const MainPages = () => {
   };
 
   const handleAutoUploadAndProcess = async (selectedFile) => {
-    setIsUploading(true);
     setIsProcessing(true);
-    
     try {
-      console.log('🚀 Auto-uploading file to S3:', selectedFile.name);
-      const uploadResult = await S3Service.uploadFile(selectedFile);
-      
-      if (uploadResult.success) {
-        console.log('✅ Upload successful:', uploadResult.key);
-        console.log('🔄 All previous files deleted, now showing only the latest upload');
-        
-        // Add a small delay to ensure S3 processes the upload and deletions
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        
-        // Force refresh available data to ensure we see only the new file
-        console.log('🔄 Force refreshing data list to confirm single file...');
-        await checkAvailableData(true);
-        
-        // Now process the file
-        const fileExtension = selectedFile.name?.split(".").pop().toLowerCase();
-
-        if (fileExtension === "csv") {
-          Papa.parse(selectedFile, {
-            complete: (result) => {
-              processData(result.data);
-              setIsProcessing(false);
-              setIsUploading(false);
-            },
-            error: (err) => {
-              console.error(err);
-              setIsProcessing(false);
-              setIsUploading(false);
-            },
-            skipEmptyLines: true,
-          });
-        } else if (["xlsx", "xls"].includes(fileExtension)) {
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            const data = e.target.result;
-            const workbook = XLSX.read(data, { type: "array" });
-            const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-            const range = XLSX.utils.decode_range(worksheet['!ref']);
-            range.e.c = 20; // force to include 21 columns (0-based index)
-            
-            worksheet['!ref'] = XLSX.utils.encode_range(range);
-            const excelData = XLSX.utils.sheet_to_json(worksheet, {
-              header: 1,
-              defval: "",
-            });
-            console.log('Excel data loaded:', excelData);
-            processData(excelData);
+      const fileExtension = selectedFile.name?.split(".").pop().toLowerCase();
+      if (fileExtension === "csv") {
+        Papa.parse(selectedFile, {
+          complete: (result) => {
+            processData(result.data);
             setIsProcessing(false);
-            setIsUploading(false);
-          };
-          reader.readAsArrayBuffer(selectedFile);
-        }
-      } else {
-        console.error('❌ Upload failed:', uploadResult.error);
-        alert('Upload failed: ' + uploadResult.error);
-        setIsProcessing(false);
-        setIsUploading(false);
+          },
+          error: (err) => {
+            console.error(err);
+            setIsProcessing(false);
+          },
+          skipEmptyLines: true,
+        });
+      } else if (["xlsx", "xls"].includes(fileExtension)) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const data = e.target.result;
+          const workbook = XLSX.read(data, { type: "array" });
+          const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+          const range = XLSX.utils.decode_range(worksheet['!ref']);
+          range.e.c = 20; // force to include 21 columns (0-based index)
+          worksheet['!ref'] = XLSX.utils.encode_range(range);
+          const excelData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
+          processData(excelData);
+          setIsProcessing(false);
+        };
+        reader.readAsArrayBuffer(selectedFile);
       }
     } catch (error) {
-      console.error('💥 Upload error:', error);
-      alert('Upload error: ' + error.message);
+      console.error('💥 Processing error:', error);
+      alert('Processing error: ' + error.message);
       setIsProcessing(false);
-      setIsUploading(false);
     }
   };
 
@@ -1043,12 +1545,12 @@ newRow[headerIndices.refinedpredt] =
     setCsvData([headers, ...processedRows]);
   };
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (!csvData || csvData.length === 0) return;
   
     const wb = XLSX.utils.book_new();
     const [headers, ...rows] = csvData;
-    console.log(headers,'sdfusdjfoidsj')
+    
     // Format date fields in the data
     const formattedRows = rows.map(row => {
         const newRow = [...row];
@@ -1116,25 +1618,30 @@ newRow[headerIndices.refinedpredt] =
     });
   
     XLSX.utils.book_append_sheet(wb, ws, "ProcessedData");
-    XLSX.writeFile(wb, "sla_report.xlsx");
+    
+    // Generate filename with current date
+    const currentDate = new Date().toISOString().split('T')[0].replace(/-/g, '');
+    const filename = `sla_report_${currentDate}.xlsx`;
+    
+    // Download locally
+    XLSX.writeFile(wb, filename);
+    
+    console.log('✅ Report downloaded locally as:', filename);
 };
 
   return (
     <div className="min-h-screen bg-gray-100 flex justify-center p-6" style={{marginLeft:'280px'}}>
       {/* Full Screen Loader Overlay */}
-      {(isCheckingData || isProcessing || isUploading) && (
+      {(isCheckingData || isProcessing) && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-8 flex flex-col items-center shadow-xl">
             <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-500 border-t-transparent mb-4"></div>
             <div className="text-center">
               <h3 className="text-lg font-semibold text-gray-800 mb-2">
-                {isCheckingData ? 'Checking for available data...' : 
-                 isUploading ? 'Uploading file...' : 
-                 'Processing data...'}
+                {isCheckingData ? 'Checking for available data...' : 'Processing data...'}
               </h3>
               <p className="text-gray-600 text-sm">
                 {isCheckingData ? 'Please wait while we check for the latest data files.' : 
-                 isUploading ? 'Your file is being uploaded and will be processed automatically.' : 
                  'Your data is being processed. This may take a few moments.'}
               </p>
             </div>
@@ -1151,11 +1658,56 @@ newRow[headerIndices.refinedpredt] =
 
 
 
+        {/* Background Service Status */}
+        {isSuperAdmin() && (
+          <div className="mb-6">
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="text-md font-semibold text-gray-800">Background Service</h3>
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={() => {
+                      setProcessedFiles(new Set());
+                      console.log('🗑️ Cleared processed files cache');
+                    }}
+                    className="px-2 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
+                    title="Clear processed files cache"
+                  >
+                    Clear Cache
+                  </button>
+                  <div className="flex items-center space-x-2">
+                    <div className={`w-2 h-2 rounded-full ${
+                      backgroundServiceStatus === 'running' ? 'bg-green-500' :
+                      backgroundServiceStatus === 'processing' ? 'bg-blue-500 animate-pulse' :
+                      backgroundServiceStatus === 'checking' ? 'bg-yellow-500 animate-pulse' :
+                      backgroundServiceStatus === 'error' ? 'bg-red-500' :
+                      'bg-gray-500'
+                    }`}></div>
+                    <span className="text-sm text-gray-600 capitalize">{backgroundServiceStatus}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="text-sm text-gray-600">
+                <p>Automatically checks for new files every 10 minutes</p>
+                <p className="text-xs text-gray-500 mt-1">Processed {processedFiles.size} files</p>
+                {lastProcessedFile && (
+                  <p className="mt-1">
+                    <span className="font-medium">Last processed:</span> {lastProcessedFile.name}
+                    <span className="text-gray-500 ml-2">
+                      ({new Date(lastProcessedFile.lastModifiedDateTime).toLocaleString()})
+                    </span>
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Data Availability Status */}
         {isSuperAdmin()&& dataCheckComplete && !isCheckingData && (
           <div className="mb-6">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold text-gray-800">File Status</h2>
+              <h2 className="text-lg font-semibold text-gray-800">SharePoint Files</h2>
               <button
                 onClick={() => checkAvailableData(true)}
                 disabled={isCheckingData}
@@ -1165,7 +1717,7 @@ newRow[headerIndices.refinedpredt] =
               </button>
             </div>
             
-            {availableData.length === 0 ? (
+             {(!availableData.input || availableData.input.length === 0) && (!availableData.output || availableData.output.length === 0) ? (
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                 <div className="flex items-center">
                   <div className="flex-shrink-0">
@@ -1175,60 +1727,105 @@ newRow[headerIndices.refinedpredt] =
                   </div>
                   <div className="ml-3">
                     <h3 className="text-sm font-medium text-yellow-800">
-                      No Data Available
+                      No Files Available
                     </h3>
                     <div className="mt-2 text-sm text-yellow-700">
-                      {isSuperAdmin() ? (
-                        <p>Please upload data files (CSV, Excel) to get started with SLA reporting.</p>
-                      ) : (
-                        <p>No data files are currently available. Please contact your administrator to upload the required data files.</p>
-                      )}
+                       <p>Please upload data files (CSV, Excel) to get started with SLA reporting.</p>
                     </div>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-           
-                
-                {/* Available Data Files List */}
-                <div className="mt-4">
-                  <h4 className="text-sm font-medium text-gray-700 mb-2">Available Files:</h4>
-                  <div className="space-y-2">
-                    {availableData.map((dataFile, index) => (
-                      <div key={index} className="flex items-center justify-between p-3 bg-white rounded-md border border-gray-200">
-                        <div className="flex items-center space-x-3">
-                          <div className="flex-shrink-0">
-                            <svg className="h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+              <div className="space-y-6">
+                {/* Input Files Section */}
+                {availableData.input && availableData.input.length > 0 && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <h4 className="text-md font-semibold text-blue-800 mb-3 flex items-center">
+                      <svg className="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
+                      Input Files ({availableData.input.length})
+                    </h4>
+                    <div className="space-y-2">
+                      {availableData.input.map((dataFile, index) => (
+                         <div key={index} className="flex items-center justify-between p-3 bg-white rounded-md border border-gray-200">
+                          <div className="flex items-center space-x-3">
+                            <div className="flex-shrink-0">
+                              <svg className="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+                              </svg>
+                            </div>
+                            <div>
+                               <p className="text-sm font-medium text-gray-900">{dataFile.name}</p>
+                               <p className="text-xs text-gray-500">
+                                 Modified: {new Date(dataFile.lastModifiedDateTime || dataFile.createdDateTime).toLocaleDateString()}
+                                 {dataFile.size && ` • ${formatFileSize(dataFile.size)}`}
+                               </p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleDownloadFile(dataFile, 'input')}
+                            disabled={isProcessing}
+                            className="px-3 py-1 text-xs bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors duration-200 flex items-center"
+                          >
+                            <svg className="h-3 w-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                             </svg>
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-gray-900">
-                              {dataFile.key}
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              Size: {formatFileSize(dataFile.size)} • Modified: {new Date(dataFile.lastModified).toLocaleDateString()}
-                            </p>
-                          </div>
+                            Download
+                          </button>
                         </div>
-                        <button
-                          onClick={() => handleLoadFromS3(dataFile)}
-                          disabled={isProcessing}
-                          className="px-3 py-1 text-xs bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors duration-200"
-                        >
-                          {isProcessing ? 'Loading...' : 'Submit'}
-                        </button>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
+
+                {/* Output Files Section */}
+                {availableData.output && availableData.output.length > 0 && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <h4 className="text-md font-semibold text-green-800 mb-3 flex items-center">
+                      <svg className="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 11-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                      </svg>
+                      SLA Reports ({availableData.output.length})
+                    </h4>
+                    <div className="space-y-2">
+                      {availableData.output.map((dataFile, index) => (
+                         <div key={index} className="flex items-center justify-between p-3 bg-white rounded-md border border-gray-200">
+                          <div className="flex items-center space-x-3">
+                            <div className="flex-shrink-0">
+                              <svg className="h-5 w-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+                              </svg>
+                            </div>
+                            <div>
+                               <p className="text-sm font-medium text-gray-900">{dataFile.name}</p>
+                               <p className="text-xs text-gray-500">
+                                 Generated: {new Date(dataFile.lastModifiedDateTime || dataFile.createdDateTime).toLocaleDateString()}
+                                 {dataFile.size && ` • ${formatFileSize(dataFile.size)}`}
+                               </p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleDownloadFile(dataFile, 'output')}
+                            disabled={isProcessing}
+                            className="px-3 py-1 text-xs bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors duration-200 flex items-center"
+                          >
+                            <svg className="h-3 w-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            Download
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
         )}
 
-     { isSuperAdmin()&&  <div className="mb-8">
+      { isSuperAdmin()&&  <div className="mb-8">
           <div className="bg-white border-2 border-dashed border-gray-300 rounded-lg p-6 hover:border-indigo-400 transition-colors duration-200">
             <div className="text-center">
               <svg className="mx-auto h-12 w-12 text-gray-400 mb-4" stroke="currentColor" fill="none" viewBox="0 0 48 48">
@@ -1261,7 +1858,7 @@ newRow[headerIndices.refinedpredt] =
                     <span className="text-sm font-medium text-gray-900">{file.name}</span>
                     <span className="ml-2 text-xs text-gray-500">({(file.size / 1024 / 1024).toFixed(2)} MB)</span>
                   </div>
-                  {!isUploading && !isProcessing && (
+                  {!isProcessing && (
                     <button
                       onClick={() => setFile(null)}
                       className="text-red-500 hover:text-red-700 text-sm"
@@ -1272,7 +1869,7 @@ newRow[headerIndices.refinedpredt] =
                 </div>
                 
                 {/* Status Display */}
-                {(isUploading || isProcessing) && (
+                 {isProcessing && (
                   <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
                     <div className="flex items-center">
                       <svg className="animate-spin h-4 w-4 text-blue-500 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -1280,13 +1877,7 @@ newRow[headerIndices.refinedpredt] =
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
                       <span className="text-sm text-blue-700">
-                        {isUploading && isProcessing 
-                          ? isSuperAdmin() 
-                            ? "Uploading to S3 and processing data..." 
-                            : "Processing data..."
-                          : isUploading 
-                            ? "Uploading to S3..." 
-                            : "Processing data..."}
+                        Processing data...
                       </span>
                     </div>
                   </div>
