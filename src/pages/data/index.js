@@ -337,6 +337,16 @@ export const MainPages = () => {
     }
   });
 
+  // Enhanced tracking for input files with more detailed metadata
+  const [processedInputFiles, setProcessedInputFiles] = useState(() => {
+    try {
+      const stored = localStorage.getItem('sla_processed_input_files');
+      return stored ? JSON.parse(stored) : {};
+    } catch {
+      return {};
+    }
+  });
+
   // Check for available data via backend SharePoint when component loads
   useEffect(() => {
     checkAvailableData();
@@ -358,6 +368,15 @@ export const MainPages = () => {
       console.warn('Failed to save processed files to localStorage:', error);
     }
   }, [processedFiles]);
+
+  // Persist processed input files to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('sla_processed_input_files', JSON.stringify(processedInputFiles));
+    } catch (error) {
+      console.warn('Failed to save processed input files to localStorage:', error);
+    }
+  }, [processedInputFiles]);
 
   // Auto-load latest data file when available
   useEffect(() => {
@@ -413,10 +432,19 @@ export const MainPages = () => {
     // Run immediately once
     processLatestFile();
     
+    // Clean up old processed files on startup
+    cleanupOldProcessedFiles();
+    
     // Then run every 10 minutes (600,000 ms)
     window.backgroundServiceInterval = setInterval(() => {
       console.log('⏰ Background service: Checking for new files...');
       processLatestFile();
+      
+      // Clean up old processed files every hour (6 intervals of 10 minutes)
+      const now = new Date();
+      if (now.getMinutes() < 10) {
+        cleanupOldProcessedFiles();
+      }
     }, 10 * 60 * 1000);
   };
 
@@ -440,33 +468,103 @@ export const MainPages = () => {
       // Sort by lastModifiedDateTime to get the latest
       files.sort((a,b) => new Date(b.lastModifiedDateTime || 0) - new Date(a.lastModifiedDateTime || 0));
       const latestFile = files[0];
-      
-      // Check if we've already processed this file
-      const fileKey = `${latestFile.id}_${latestFile.lastModifiedDateTime}`;
-      if (processedFiles.has(fileKey)) {
-        console.log('✅ Latest file already processed:', latestFile.name);
+
+      // Determine the planned output filename for today
+      const plannedOutputFilename = generateReportFilename();
+
+      // Local quick check to avoid unnecessary API calls
+      try {
+        const lastUpStr = localStorage.getItem('sla_last_uploaded_report');
+        if (lastUpStr) {
+          const lastUp = JSON.parse(lastUpStr);
+          if ((lastUp?.name || '').trim() === plannedOutputFilename) {
+            console.log('⏭️ Local cache indicates today\'s report already uploaded:', plannedOutputFilename);
+            setBackgroundServiceStatus('running');
+            return;
+          }
+        }
+      } catch (e) {
+        // ignore cache parse errors
+      }
+
+      // Check if this input file has already been processed using enhanced tracking
+      if (isInputFileProcessed(latestFile)) {
+        console.log('✅ Latest file already processed (from enhanced cache):', latestFile.name);
         setBackgroundServiceStatus('running');
         return;
+      }
+
+      // Skip if the same file is currently being processed (within last 15 minutes)
+      try {
+        const procStr = localStorage.getItem('sla_processing_input_file');
+        if (procStr) {
+          const proc = JSON.parse(procStr);
+          if (proc?.id === latestFile.id && proc?.lastModifiedDateTime === latestFile.lastModifiedDateTime) {
+            const startedAt = new Date(proc.startedAt).getTime();
+            const now = Date.now();
+            if (!isNaN(startedAt) && now - startedAt < 15 * 60 * 1000) {
+              console.log('⏭️ This input file is already being processed. Skipping.');
+              setBackgroundServiceStatus('running');
+              return;
+            }
+          }
+        }
+      } catch {}
+
+      // Fetch the latest output file and skip if names match
+      try {
+        const outResp = await api.get('/api/sharepoint/output_files');
+        const outFiles = (outResp?.data?.files || []).filter(item => {
+          const name = (item?.name || '').toLowerCase();
+          return name.endsWith('.csv') || name.endsWith('.xlsx') || name.endsWith('.xls');
+        });
+        if (outFiles.length > 0) {
+          outFiles.sort((a,b) => new Date(b.lastModifiedDateTime || 0) - new Date(a.lastModifiedDateTime || 0));
+          const latestOut = outFiles[0];
+          if ((latestOut?.name || '').trim() === plannedOutputFilename) {
+            console.log('⏭️ Latest SharePoint output already has the planned report:', plannedOutputFilename);
+            setBackgroundServiceStatus('running');
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn('⚠️ Could not check output files. Proceeding with processing.', e);
       }
       
       console.log('🆕 New file found, processing:', latestFile.name);
       setBackgroundServiceStatus('processing');
       
+      // Mark current file as processing in localStorage to avoid duplicates
+      try {
+        localStorage.setItem('sla_processing_input_file', JSON.stringify({
+          id: latestFile.id,
+          lastModifiedDateTime: latestFile.lastModifiedDateTime,
+          startedAt: new Date().toISOString()
+        }));
+      } catch {}
+
       // Download and process the file
-      await downloadAndProcessFile(latestFile);
+      const result = await downloadAndProcessFile(latestFile);
       
-      // Mark as processed
+      // Mark as processed using enhanced tracking
+      const outputFileName = generateReportFilename();
+      markInputFileAsProcessed(latestFile, outputFileName);
+      
+      // Keep old tracking for backward compatibility
+      const fileKey = `${latestFile.id}_${latestFile.lastModifiedDateTime}`;
       setProcessedFiles(prev => new Set(prev).add(fileKey));
       setLastProcessedFile(latestFile);
       
-      console.log('✅ File processed successfully:', latestFile.name);
+      console.log('✅ File processed successfully:', latestFile.name, 'Output:', outputFileName);
       setBackgroundServiceStatus('running');
+      try { localStorage.removeItem('sla_processing_input_file'); } catch {}
       
     } catch (error) {
       console.error('❌ Error in background processing:', error);
       setBackgroundServiceStatus('error');
       // Reset to running after 1 minute
       setTimeout(() => setBackgroundServiceStatus('running'), 60000);
+      try { localStorage.removeItem('sla_processing_input_file'); } catch {}
     }
   };
 
@@ -493,7 +591,7 @@ export const MainPages = () => {
             complete: async (result) => {
               try {
                 const processedData = await processFileData(result.data);
-                await uploadProcessedFile(processedData, file.name);
+                await uploadProcessedFile(processedData, file);
                 resolve(processedData);
               } catch (error) {
                 reject(error);
@@ -517,7 +615,7 @@ export const MainPages = () => {
               const excelData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
               
               const processedData = await processFileData(excelData);
-              await uploadProcessedFile(processedData, file.name);
+              await uploadProcessedFile(processedData, file);
               resolve(processedData);
             } catch (error) {
               reject(error);
@@ -533,6 +631,76 @@ export const MainPages = () => {
       console.error('💥 Error downloading/processing file:', error);
       throw error;
     }
+  };
+
+  const generateReportFilename = () => {
+    const currentDate = new Date().toISOString().split('T')[0].replace(/-/g, '');
+    return `sla_report_${currentDate}.xlsx`;
+  };
+
+  // Helper function to create a unique key for input files
+  const createInputFileKey = (file) => {
+    return `${file.name}_${file.id}_${file.lastModifiedDateTime}`;
+  };
+
+  // Helper function to check if input file has been processed
+  const isInputFileProcessed = (file) => {
+    const fileKey = createInputFileKey(file);
+    const processedInfo = processedInputFiles[fileKey];
+    
+    if (!processedInfo) return false;
+    
+    // Check if the file was processed recently (within last 24 hours to handle edge cases)
+    const processedTime = new Date(processedInfo.processedAt);
+    const now = new Date();
+    const hoursSinceProcessed = (now - processedTime) / (1000 * 60 * 60);
+    
+    // If processed more than 24 hours ago, consider it unprocessed (safety measure)
+    if (hoursSinceProcessed > 24) {
+      console.log(`File ${file.name} was processed more than 24 hours ago, will reprocess`);
+      return false;
+    }
+    
+    return true;
+  };
+
+  // Helper function to mark input file as processed
+  const markInputFileAsProcessed = (file, outputFileName = null) => {
+    const fileKey = createInputFileKey(file);
+    setProcessedInputFiles(prev => ({
+      ...prev,
+      [fileKey]: {
+        fileName: file.name,
+        fileId: file.id,
+        lastModifiedDateTime: file.lastModifiedDateTime,
+        processedAt: new Date().toISOString(),
+        outputFileName: outputFileName,
+        fileSize: file.size
+      }
+    }));
+  };
+
+  // Helper function to clean up old processed files (older than 7 days)
+  const cleanupOldProcessedFiles = () => {
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    
+    setProcessedInputFiles(prev => {
+      const cleaned = {};
+      Object.entries(prev).forEach(([key, value]) => {
+        const processedTime = new Date(value.processedAt);
+        if (processedTime > sevenDaysAgo) {
+          cleaned[key] = value;
+        }
+      });
+      
+      const removedCount = Object.keys(prev).length - Object.keys(cleaned).length;
+      if (removedCount > 0) {
+        console.log(`🧹 Cleaned up ${removedCount} old processed file records`);
+      }
+      
+      return cleaned;
+    });
   };
 
   const processFileData = async (data) => {
@@ -854,7 +1022,7 @@ export const MainPages = () => {
     return [headers, ...processedRows];
   };
 
-  const uploadProcessedFile = async (processedData, originalFileName) => {
+  const uploadProcessedFile = async (processedData, sourceFile) => {
     try {
       console.log('📤 Uploading processed file to SharePoint...');
       
@@ -928,23 +1096,46 @@ export const MainPages = () => {
       XLSX.utils.book_append_sheet(wb, ws, "ProcessedData");
       
       // Generate filename with current date in sla_report_YYYYMMDD.xlsx format
-      const currentDate = new Date().toISOString().split('T')[0].replace(/-/g, '');
-      const filename = `sla_report_${currentDate}.xlsx`;
+      const filename = generateReportFilename();
+      // If local cache says same report uploaded, skip calling API
+      try {
+        const lastUpStr = localStorage.getItem('sla_last_uploaded_report');
+        if (lastUpStr) {
+          const lastUp = JSON.parse(lastUpStr);
+          if ((lastUp?.name || '').trim() === filename) {
+            console.log('⏭️ Skipping upload; report already uploaded today (from cache):', filename);
+            return { skipped: true, reason: 'cached_already_uploaded' };
+          }
+        }
+      } catch {}
       
       // Convert workbook to buffer
       const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
-      const file = new File([buffer], filename, {
+      const outFile = new File([buffer], filename, {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
       });
       
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('file', outFile);
       
       const uploadResponse = await api.post('/api/sharepoint/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       
       console.log('✅ Processed file uploaded to SharePoint successfully:', uploadResponse.data);
+
+      // Save last uploaded report info to localStorage for de-dup after 10 minutes
+      try {
+        const info = {
+          name: filename,
+          uploadedAt: new Date().toISOString(),
+          sourceFileId: sourceFile?.id || null,
+          sourceLastModifiedDateTime: sourceFile?.lastModifiedDateTime || null
+        };
+        localStorage.setItem('sla_last_uploaded_report', JSON.stringify(info));
+      } catch (e) {
+        console.warn('Failed to save last uploaded report info to localStorage', e);
+      }
       return uploadResponse.data;
       
     } catch (error) {
@@ -986,6 +1177,22 @@ export const MainPages = () => {
     } catch (error) {
       console.error('❌ Error downloading file:', error);
       alert('Failed to download file. Please try again.');
+    }
+  };
+
+  // Function to delete file from SharePoint
+  const handleDeleteFile = async (file, folderType) => {
+    try {
+      if (!file?.id) return;
+      const confirm = window.confirm(`Are you sure you want to delete "${file.name}" from ${folderType} folder?`);
+      if (!confirm) return;
+      console.log(`🗑️ Deleting ${folderType} file:`, file.name);
+      await api.delete(`/api/sharepoint/delete/${folderType}/${file.id}`);
+      console.log('✅ File deleted:', file.name);
+      await checkAvailableData(true);
+    } catch (error) {
+      console.error('❌ Error deleting file:', error);
+      alert('Failed to delete file. Please try again.');
     }
   };
 
@@ -1668,10 +1875,11 @@ newRow[headerIndices.refinedpredt] =
                   <button
                     onClick={() => {
                       setProcessedFiles(new Set());
-                      console.log('🗑️ Cleared processed files cache');
+                      setProcessedInputFiles({});
+                      console.log('🗑️ Cleared all processed files cache');
                     }}
                     className="px-2 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
-                    title="Clear processed files cache"
+                    title="Clear all processed files cache"
                   >
                     Clear Cache
                   </button>
@@ -1689,7 +1897,9 @@ newRow[headerIndices.refinedpredt] =
               </div>
               <div className="text-sm text-gray-600">
                 <p>Automatically checks for new files every 10 minutes</p>
-                <p className="text-xs text-gray-500 mt-1">Processed {processedFiles.size} files</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Processed {Object.keys(processedInputFiles).length} input files ({processedFiles.size} total)
+                </p>
                 {lastProcessedFile && (
                   <p className="mt-1">
                     <span className="font-medium">Last processed:</span> {lastProcessedFile.name}
@@ -1763,16 +1973,28 @@ newRow[headerIndices.refinedpredt] =
                                </p>
                             </div>
                           </div>
-                          <button
-                            onClick={() => handleDownloadFile(dataFile, 'input')}
-                            disabled={isProcessing}
-                            className="px-3 py-1 text-xs bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors duration-200 flex items-center"
-                          >
-                            <svg className="h-3 w-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                            Download
-                          </button>
+                          <div className="flex items-center space-x-2">
+                            <button
+                              onClick={() => handleDownloadFile(dataFile, 'input')}
+                              disabled={isProcessing}
+                              className="px-3 py-1 text-xs bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors duration-200 flex items-center"
+                            >
+                              <svg className="h-3 w-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                              </svg>
+                              Download
+                            </button>
+                            <button
+                              onClick={() => handleDeleteFile(dataFile, 'input')}
+                              disabled={isProcessing}
+                              className="px-3 py-1 text-xs bg-red-600 text-white rounded-md hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors duration-200 flex items-center"
+                            >
+                              <svg className="h-3 w-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7h6m2 0a2 2 0 01-2-2V5a2 2 0 00-2-2h-2a2 2 0 00-2 2v0a2 2 0 01-2 2m10 0H5" />
+                              </svg>
+                              Delete
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -1805,16 +2027,28 @@ newRow[headerIndices.refinedpredt] =
                                </p>
                             </div>
                           </div>
-                          <button
-                            onClick={() => handleDownloadFile(dataFile, 'output')}
-                            disabled={isProcessing}
-                            className="px-3 py-1 text-xs bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors duration-200 flex items-center"
-                          >
-                            <svg className="h-3 w-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                            Download
-                          </button>
+                          <div className="flex items-center space-x-2">
+                            <button
+                              onClick={() => handleDownloadFile(dataFile, 'output')}
+                              disabled={isProcessing}
+                              className="px-3 py-1 text-xs bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors duration-200 flex items-center"
+                            >
+                              <svg className="h-3 w-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                              </svg>
+                              Download
+                            </button>
+                            <button
+                              onClick={() => handleDeleteFile(dataFile, 'output')}
+                              disabled={isProcessing}
+                              className="px-3 py-1 text-xs bg-red-600 text-white rounded-md hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors duration-200 flex items-center"
+                            >
+                              <svg className="h-3 w-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7h6m2 0a2 2 0 01-2-2V5a2 2 0 00-2-2h-2a2 2 0 00-2 2v0a2 2 0 01-2 2m10 0H5" />
+                              </svg>
+                              Delete
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
