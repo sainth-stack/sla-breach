@@ -633,9 +633,17 @@ export const MainPages = () => {
     }
   };
 
+  const REPORT_PREFIX = "EI Inc Powbi"; // Static prefix per requirement
   const generateReportFilename = () => {
-    const currentDate = new Date().toISOString().split('T')[0].replace(/-/g, '');
-    return `sla_report_${currentDate}.xlsx`;
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    const hh = String(now.getHours()).padStart(2, '0');
+    const mi = String(now.getMinutes()).padStart(2, '0');
+    const ss = String(now.getSeconds()).padStart(2, '0');
+    // "EI Inc Powbi YYYYMMDD_HHMMSS.xlsx"
+    return `${REPORT_PREFIX} ${yyyy}${mm}${dd}_${hh}${mi}${ss}.xlsx`;
   };
 
   // Helper function to create a unique key for input files
@@ -1095,7 +1103,7 @@ export const MainPages = () => {
     
       XLSX.utils.book_append_sheet(wb, ws, "ProcessedData");
       
-      // Generate filename with current date in sla_report_YYYYMMDD.xlsx format
+      // Generate filename with current date and time in sla_report_YYYYMMDD_HHMMSS.xlsx format
       const filename = generateReportFilename();
       // If local cache says same report uploaded, skip calling API
       try {
@@ -1826,9 +1834,8 @@ newRow[headerIndices.refinedpredt] =
   
     XLSX.utils.book_append_sheet(wb, ws, "ProcessedData");
     
-    // Generate filename with current date
-    const currentDate = new Date().toISOString().split('T')[0].replace(/-/g, '');
-    const filename = `sla_report_${currentDate}.xlsx`;
+    // Generate filename with current date and time
+    const filename = generateReportFilename();
     
     // Download locally
     XLSX.writeFile(wb, filename);
