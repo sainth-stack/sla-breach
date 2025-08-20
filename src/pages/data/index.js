@@ -6,6 +6,7 @@ import { isSuperAdmin } from "../../utils/auth";
 import api from "../../const";
 
 // Constants
+const CHECK_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes (UI background check cadence)
 const YELLOW_FIELDS = [
   "ResolSLA",
   "RespSLA",
@@ -337,15 +338,11 @@ export const MainPages = () => {
     }
   });
 
-  // Enhanced tracking for input files with more detailed metadata
-  const [processedInputFiles, setProcessedInputFiles] = useState(() => {
-    try {
-      const stored = localStorage.getItem('sla_processed_input_files');
-      return stored ? JSON.parse(stored) : {};
-    } catch {
-      return {};
-    }
-  });
+  // Countdown to next background check
+  const [nextCheckAt, setNextCheckAt] = useState(null);
+  const [nowTs, setNowTs] = useState(Date.now());
+
+
 
   // Check for available data via backend SharePoint when component loads
   useEffect(() => {
@@ -360,6 +357,12 @@ export const MainPages = () => {
     };
   }, []);
 
+  // Tick every second to update countdown
+  useEffect(() => {
+    const t = setInterval(() => setNowTs(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
   // Persist processed files to localStorage
   useEffect(() => {
     try {
@@ -369,14 +372,7 @@ export const MainPages = () => {
     }
   }, [processedFiles]);
 
-  // Persist processed input files to localStorage
-  useEffect(() => {
-    try {
-      localStorage.setItem('sla_processed_input_files', JSON.stringify(processedInputFiles));
-    } catch (error) {
-      console.warn('Failed to save processed input files to localStorage:', error);
-    }
-  }, [processedInputFiles]);
+
 
   // Auto-load latest data file when available
   useEffect(() => {
@@ -431,21 +427,25 @@ export const MainPages = () => {
     
     // Run immediately once
     processLatestFile();
+    // Schedule next check
+    setNextCheckAt(Date.now() + CHECK_INTERVAL_MS);
     
     // Clean up old processed files on startup
-    cleanupOldProcessedFiles();
+
     
-    // Then run every 10 minutes (600,000 ms)
+    // Then run every CHECK_INTERVAL_MS
     window.backgroundServiceInterval = setInterval(() => {
       console.log('⏰ Background service: Checking for new files...');
+      // compute the next check time at the start of this cycle
+      setNextCheckAt(Date.now() + CHECK_INTERVAL_MS);
       processLatestFile();
       
       // Clean up old processed files every hour (6 intervals of 10 minutes)
       const now = new Date();
       if (now.getMinutes() < 10) {
-        cleanupOldProcessedFiles();
+    
       }
-    }, 10 * 60 * 1000);
+    }, CHECK_INTERVAL_MS);
   };
 
   const processLatestFile = async () => {
@@ -469,86 +469,24 @@ export const MainPages = () => {
       files.sort((a,b) => new Date(b.lastModifiedDateTime || 0) - new Date(a.lastModifiedDateTime || 0));
       const latestFile = files[0];
 
-      // Determine the planned output filename for today
-      const plannedOutputFilename = generateReportFilename();
-
-      // Local quick check to avoid unnecessary API calls
-      try {
-        const lastUpStr = localStorage.getItem('sla_last_uploaded_report');
-        if (lastUpStr) {
-          const lastUp = JSON.parse(lastUpStr);
-          if ((lastUp?.name || '').trim() === plannedOutputFilename) {
-            console.log('⏭️ Local cache indicates today\'s report already uploaded:', plannedOutputFilename);
-            setBackgroundServiceStatus('running');
-            return;
-          }
-        }
-      } catch (e) {
-        // ignore cache parse errors
-      }
-
-      // Check if this input file has already been processed using enhanced tracking
-      if (isInputFileProcessed(latestFile)) {
-        console.log('✅ Latest file already processed (from enhanced cache):', latestFile.name);
-        setBackgroundServiceStatus('running');
-        return;
-      }
-
-      // Skip if the same file is currently being processed (within last 15 minutes)
-      try {
-        const procStr = localStorage.getItem('sla_processing_input_file');
-        if (procStr) {
-          const proc = JSON.parse(procStr);
-          if (proc?.id === latestFile.id && proc?.lastModifiedDateTime === latestFile.lastModifiedDateTime) {
-            const startedAt = new Date(proc.startedAt).getTime();
-            const now = Date.now();
-            if (!isNaN(startedAt) && now - startedAt < 15 * 60 * 1000) {
-              console.log('⏭️ This input file is already being processed. Skipping.');
-              setBackgroundServiceStatus('running');
-              return;
-            }
-          }
-        }
-      } catch {}
-
-      // Fetch the latest output file and skip if names match
-      try {
-        const outResp = await api.get('/api/sharepoint/output_files');
-        const outFiles = (outResp?.data?.files || []).filter(item => {
-          const name = (item?.name || '').toLowerCase();
-          return name.endsWith('.csv') || name.endsWith('.xlsx') || name.endsWith('.xls');
-        });
-        if (outFiles.length > 0) {
-          outFiles.sort((a,b) => new Date(b.lastModifiedDateTime || 0) - new Date(a.lastModifiedDateTime || 0));
-          const latestOut = outFiles[0];
-          if ((latestOut?.name || '').trim() === plannedOutputFilename) {
-            console.log('⏭️ Latest SharePoint output already has the planned report:', plannedOutputFilename);
-            setBackgroundServiceStatus('running');
-            return;
-          }
-        }
-      } catch (e) {
-        console.warn('⚠️ Could not check output files. Proceeding with processing.', e);
-      }
+      // Backend will handle all de-duplication checks
       
       console.log('🆕 New file found, processing:', latestFile.name);
       setBackgroundServiceStatus('processing');
       
-      // Mark current file as processing in localStorage to avoid duplicates
-      try {
-        localStorage.setItem('sla_processing_input_file', JSON.stringify({
-          id: latestFile.id,
-          lastModifiedDateTime: latestFile.lastModifiedDateTime,
-          startedAt: new Date().toISOString()
-        }));
-      } catch {}
+
 
       // Download and process the file
       const result = await downloadAndProcessFile(latestFile);
       
-      // Mark as processed using enhanced tracking
+      // Check if processing was skipped by backend
+      if (result?.skipped) {
+        console.log('⏭️ Processing skipped by backend:', result.message);
+        setBackgroundServiceStatus('running');
+        return;
+      }
+      
       const outputFileName = generateReportFilename();
-      markInputFileAsProcessed(latestFile, outputFileName);
       
       // Keep old tracking for backward compatibility
       const fileKey = `${latestFile.id}_${latestFile.lastModifiedDateTime}`;
@@ -646,70 +584,9 @@ export const MainPages = () => {
     return `${REPORT_PREFIX} ${yyyy}${mm}${dd}_${hh}${mi}${ss}.xlsx`;
   };
 
-  // Helper function to create a unique key for input files
-  const createInputFileKey = (file) => {
-    return `${file.name}_${file.id}_${file.lastModifiedDateTime}`;
-  };
 
-  // Helper function to check if input file has been processed
-  const isInputFileProcessed = (file) => {
-    const fileKey = createInputFileKey(file);
-    const processedInfo = processedInputFiles[fileKey];
-    
-    if (!processedInfo) return false;
-    
-    // Check if the file was processed recently (within last 24 hours to handle edge cases)
-    const processedTime = new Date(processedInfo.processedAt);
-    const now = new Date();
-    const hoursSinceProcessed = (now - processedTime) / (1000 * 60 * 60);
-    
-    // If processed more than 24 hours ago, consider it unprocessed (safety measure)
-    if (hoursSinceProcessed > 24) {
-      console.log(`File ${file.name} was processed more than 24 hours ago, will reprocess`);
-      return false;
-    }
-    
-    return true;
-  };
 
-  // Helper function to mark input file as processed
-  const markInputFileAsProcessed = (file, outputFileName = null) => {
-    const fileKey = createInputFileKey(file);
-    setProcessedInputFiles(prev => ({
-      ...prev,
-      [fileKey]: {
-        fileName: file.name,
-        fileId: file.id,
-        lastModifiedDateTime: file.lastModifiedDateTime,
-        processedAt: new Date().toISOString(),
-        outputFileName: outputFileName,
-        fileSize: file.size
-      }
-    }));
-  };
 
-  // Helper function to clean up old processed files (older than 7 days)
-  const cleanupOldProcessedFiles = () => {
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    
-    setProcessedInputFiles(prev => {
-      const cleaned = {};
-      Object.entries(prev).forEach(([key, value]) => {
-        const processedTime = new Date(value.processedAt);
-        if (processedTime > sevenDaysAgo) {
-          cleaned[key] = value;
-        }
-      });
-      
-      const removedCount = Object.keys(prev).length - Object.keys(cleaned).length;
-      if (removedCount > 0) {
-        console.log(`🧹 Cleaned up ${removedCount} old processed file records`);
-      }
-      
-      return cleaned;
-    });
-  };
 
   const processFileData = async (data) => {
     if (!data || data.length === 0) throw new Error('No data to process');
@@ -1071,64 +948,32 @@ export const MainPages = () => {
       });
 
       const ws = XLSX.utils.aoa_to_sheet([headers, ...formattedRows]);
-    
-      const HIGHLIGHT_FIELDS = [
-        "ResolSLA", "RespSLA", "ReqComp", "ReqCrDtConc", "EnDtConc", 
-        "HisChDtTiConc", "ElapsedTime", "CalcPreDt", "RefinedPreDt", 
-        "CalcStDt", "RefinedStDt", "Cumilative", "ResolSOW", "RespSOW", 
-        "ResolRem", "RespRem", "Rollover", "ReqCrYM", "DateRollover", "DateReqCrYM"
-      ];
-    
-      const highlightCols = headers.reduce((acc, header, idx) => {
-        if (HIGHLIGHT_FIELDS.includes(header)) acc[idx] = true;
-        return acc;
-      }, {});
-      
-      Object.keys(ws).forEach(key => {
-        if (key !== '!ref') {
-          const col = XLSX.utils.decode_cell(key).c;
-          if (highlightCols[col]) {
-            ws[key].s = {
-              fill: { 
-                patternType: "solid", 
-                fgColor: { rgb: "ADD8E6" } // Light blue color
-              },
-              font: { 
-                bold: XLSX.utils.decode_cell(key).r === 0 // Bold for header row
-              }
-            };
-          }
-        }
-      });
-    
+      // Keep workbook minimal to reduce file size
       XLSX.utils.book_append_sheet(wb, ws, "ProcessedData");
       
       // Generate filename with current date and time in sla_report_YYYYMMDD_HHMMSS.xlsx format
       const filename = generateReportFilename();
-      // If local cache says same report uploaded, skip calling API
-      try {
-        const lastUpStr = localStorage.getItem('sla_last_uploaded_report');
-        if (lastUpStr) {
-          const lastUp = JSON.parse(lastUpStr);
-          if ((lastUp?.name || '').trim() === filename) {
-            console.log('⏭️ Skipping upload; report already uploaded today (from cache):', filename);
-            return { skipped: true, reason: 'cached_already_uploaded' };
-          }
-        }
-      } catch {}
       
-      // Convert workbook to buffer
-      const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
-      const outFile = new File([buffer], filename, {
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-      });
-      
+      // Convert workbook to compressed ArrayBuffer and upload as Blob
+      const arrayBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array', compression: true });
+      const blob = new Blob([arrayBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       const formData = new FormData();
-      formData.append('file', outFile);
+      formData.append('file', blob, filename);
+      try {
+        formData.append('source_input_name', sourceFile?.name || '');
+      } catch (e) {
+        // ignore if sourceFile is unavailable
+      }
       
       const uploadResponse = await api.post('/api/sharepoint/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
+      
+      // Check if backend skipped due to de-duplication
+      if (uploadResponse.data?.skipped) {
+        console.log('⏭️ Backend skipped upload:', uploadResponse.data.message);
+        return { skipped: true, reason: uploadResponse.data.reason, message: uploadResponse.data.message };
+      }
       
       console.log('✅ Processed file uploaded to SharePoint successfully:', uploadResponse.data);
 
@@ -1882,7 +1727,6 @@ newRow[headerIndices.refinedpredt] =
                   <button
                     onClick={() => {
                       setProcessedFiles(new Set());
-                      setProcessedInputFiles({});
                       console.log('🗑️ Cleared all processed files cache');
                     }}
                     className="px-2 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
@@ -1903,9 +1747,21 @@ newRow[headerIndices.refinedpredt] =
                 </div>
               </div>
               <div className="text-sm text-gray-600">
-                <p>Automatically checks for new files every 10 minutes</p>
+                <p>Automatically checks for new files every {Math.floor(CHECK_INTERVAL_MS / 60000)} minutes</p>
+                {nextCheckAt && (
+                  <p className="mt-1 text-gray-700">
+                    Next check in {
+                      (() => {
+                        const remaining = Math.max(0, nextCheckAt - nowTs);
+                        const m = String(Math.floor(remaining / 60000)).padStart(2, '0');
+                        const s = String(Math.floor((remaining % 60000) / 1000)).padStart(2, '0');
+                        return `${m}:${s}`;
+                      })()
+                    }
+                  </p>
+                )}
                 <p className="text-xs text-gray-500 mt-1">
-                  Processed {Object.keys(processedInputFiles).length} input files ({processedFiles.size} total)
+                  Processed {processedFiles.size} files
                 </p>
                 {lastProcessedFile && (
                   <p className="mt-1">
