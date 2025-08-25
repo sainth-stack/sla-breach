@@ -486,7 +486,7 @@ export const MainPages = () => {
         return;
       }
       
-      const outputFileName = generateReportFilename();
+      const outputFileName = generateReportFilename(latestFile?.name);
       
       // Keep old tracking for backward compatibility
       const fileKey = `${latestFile.id}_${latestFile.lastModifiedDateTime}`;
@@ -571,8 +571,77 @@ export const MainPages = () => {
     }
   };
 
-  const REPORT_PREFIX = "EI Inc Powbi"; // Static prefix per requirement
-  const generateReportFilename = () => {
+  const REPORT_PREFIX = "EI_Inc_Powbi"; // Updated static prefix per requirement
+
+  // Extracts date-time substring from a filename.
+  // Supports patterns like:
+  //  - DD-MM-YYYY_HH-MM-SS
+  //  - DD_MM_YYYY_HH_MM_SS
+  //  - YYYY-MM-DD_HH-MM-SS
+  //  - YYYY_MM_DD_HH_MM_SS
+  // Falls back to current timestamp if absent.
+  const extractDateTimeFromFilename = (name) => {
+    if (!name || typeof name !== 'string') return null;
+    const base = name.replace(/\.[^.]+$/, '');
+
+    // 1) DD[-_\/]MM[-_\/]YYYY[ _-]HH[-:]MM[-:]SS -> DDMMYYYY_HHMMSS
+    let m = base.match(/(\d{2})[-_\/]?(\d{2})[-_\/]?(\d{4})[\s_-]?(\d{2})[-_:]?(\d{2})[-_:]?(\d{2})/);
+    if (m) {
+      const [_, dd, mm, yyyy, hh, mi, ss] = m;
+      return `${dd}${mm}${yyyy}_${hh}${mi}${ss}`;
+    }
+
+    // 2) YYYY[-_\/]MM[-_\/]DD[ _-]HH[-:]MM[-:]SS -> DDMMYYYY_HHMMSS
+    m = base.match(/(\d{4})[-_\/]?(\d{2})[-_\/]?(\d{2})[\s_-]?(\d{2})[-_:]?(\d{2})[-_:]?(\d{2})/);
+    if (m) {
+      const [_, yyyy, mm, dd, hh, mi, ss] = m;
+      return `${dd}${mm}${yyyy}_${hh}${mi}${ss}`;
+    }
+
+    // 3) Compact date with separated time: DDMMYYYY[ _-]HH[-:]MM[-:]SS -> DDMMYYYY_HHMMSS
+    m = base.match(/(\d{2})(\d{2})(\d{4})[\s_-]?(\d{2})[-_:]?(\d{2})[-_:]?(\d{2})/);
+    if (m) {
+      const [_, dd, mm, yyyy, hh, mi, ss] = m;
+      return `${dd}${mm}${yyyy}_${hh}${mi}${ss}`;
+    }
+
+    // 4) Compact date/time: YYYYMMDD[ _-]HH[-:]MM[-:]SS -> DDMMYYYY_HHMMSS
+    m = base.match(/(\d{4})(\d{2})(\d{2})[\s_-]?(\d{2})[-_:]?(\d{2})[-_:]?(\d{2})/);
+    if (m) {
+      const [_, yyyy, mm, dd, hh, mi, ss] = m;
+      return `${dd}${mm}${yyyy}_${hh}${mi}${ss}`;
+    }
+
+    // Date-only variants -> append _000000
+    m = base.match(/(\d{2})[-_\/]?(\d{2})[-_\/]?(\d{4})/);
+    if (m) {
+      const [_, dd, mm, yyyy] = m;
+      return `${dd}${mm}${yyyy}_000000`;
+    }
+    m = base.match(/(\d{4})[-_\/]?(\d{2})[-_\/]?(\d{2})/);
+    if (m) {
+      const [_, yyyy, mm, dd] = m;
+      return `${dd}${mm}${yyyy}_000000`;
+    }
+    // Compact date-only DDMMYYYY
+    m = base.match(/(\d{2})(\d{2})(\d{4})/);
+    if (m) {
+      const [_, dd, mm, yyyy] = m;
+      return `${dd}${mm}${yyyy}_000000`;
+    }
+    // Compact date-only YYYYMMDD
+    m = base.match(/(\d{4})(\d{2})(\d{2})/);
+    if (m) {
+      const [_, yyyy, mm, dd] = m;
+      return `${dd}${mm}${yyyy}_000000`;
+    }
+    return null;
+  };
+
+  const generateReportFilename = (sourceName) => {
+    const extracted = extractDateTimeFromFilename(sourceName || '');
+    console.log(extracted,'testttttttt')
+    if (extracted) return `${REPORT_PREFIX}_${extracted}.xlsx`;
     const now = new Date();
     const yyyy = now.getFullYear();
     const mm = String(now.getMonth() + 1).padStart(2, '0');
@@ -580,8 +649,7 @@ export const MainPages = () => {
     const hh = String(now.getHours()).padStart(2, '0');
     const mi = String(now.getMinutes()).padStart(2, '0');
     const ss = String(now.getSeconds()).padStart(2, '0');
-    // "EI Inc Powbi YYYYMMDD_HHMMSS.xlsx"
-    return `${REPORT_PREFIX} ${yyyy}${mm}${dd}_${hh}${mi}${ss}.xlsx`;
+    return `${REPORT_PREFIX}_${yyyy}${mm}${dd}_${hh}${mi}${ss}.xlsx`;
   };
 
 
@@ -952,8 +1020,8 @@ export const MainPages = () => {
       XLSX.utils.book_append_sheet(wb, ws, "ProcessedData");
       
       // Generate filename with current date and time in sla_report_YYYYMMDD_HHMMSS.xlsx format
-      const filename = generateReportFilename();
-      
+      const filename = generateReportFilename(sourceFile?.name);
+      console.log(filename,'testttttttt')
       // Convert workbook to compressed ArrayBuffer and upload as Blob
       const arrayBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array', compression: true });
       const blob = new Blob([arrayBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -1680,7 +1748,7 @@ newRow[headerIndices.refinedpredt] =
     XLSX.utils.book_append_sheet(wb, ws, "ProcessedData");
     
     // Generate filename with current date and time
-    const filename = generateReportFilename();
+    const filename = generateReportFilename(file?.name || '');
     
     // Download locally
     XLSX.writeFile(wb, filename);
