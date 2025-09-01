@@ -6,7 +6,7 @@ import { isSuperAdmin } from "../../utils/auth";
 import api from "../../const";
 
 // Constants
-const CHECK_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes (UI background check cadence)
+const CHECK_INTERVAL_MS = 10 * 60 * 1000; // legacy (no longer used for polling)
 const YELLOW_FIELDS = [
   "ResolSLA",
   "RespSLA",
@@ -344,18 +344,69 @@ export const MainPages = () => {
 
 
 
-  // Check for available data via backend SharePoint when component loads
+  // Check for available data and attach SSE for real-time updates
   useEffect(() => {
     checkAvailableData();
-    startBackgroundService();
-    
-    // Cleanup interval on unmount
-    return () => {
-      if (window.backgroundServiceInterval) {
-        clearInterval(window.backgroundServiceInterval);
+    const evt = new EventSource(`${api.defaults.baseURL}/api/sharepoint/sse`);
+    evt.onmessage = async (e) => {
+      try {
+        const payload = JSON.parse(e.data || '{}');
+        if (payload?.type === 'new_file_detected' && payload?.latest?.name?.toLowerCase()?.includes('hda')) {
+          const latestFile = payload.latest;
+          console.log('🆕 SSE: New HDA file detected:', latestFile?.name);
+          
+          // Check if this file was already processed
+          const fileKey = `${latestFile.id}_${latestFile.lastModifiedDateTime}`;
+          if (processedFiles.has(fileKey)) {
+            console.log('⏭️ File already processed, skipping:', latestFile?.name);
+            return;
+          }
+          
+          // Automatically process the new file using frontend processing
+          if (isSuperAdmin()) {
+            console.log('🔄 Auto-processing new HDA file via frontend...');
+            setBackgroundServiceStatus('processing');
+            
+            try {
+              // Download and process the file
+              const result = await downloadAndProcessFile(latestFile);
+              
+              // Check if processing was skipped by backend
+              if (result?.skipped) {
+                console.log('⏭️ Processing skipped:', result.message);
+                setBackgroundServiceStatus('running');
+                return;
+              }
+              
+              // Mark file as processed
+              setProcessedFiles(prev => new Set(prev).add(fileKey));
+              setLastProcessedFile(latestFile);
+              
+              console.log('✅ Successfully processed new file:', latestFile?.name);
+              
+              // Refresh the file lists to show the new output
+              await checkAvailableData(true);
+              setBackgroundServiceStatus('running');
+              
+            } catch (error) {
+              console.error('❌ Error processing new file:', error);
+              setBackgroundServiceStatus('error');
+              // Reset to running after 1 minute
+              setTimeout(() => setBackgroundServiceStatus('running'), 60000);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('SSE message parse error', err);
       }
     };
-  }, []);
+    evt.onerror = () => {
+      console.warn('SSE connection error; will let browser retry');
+    };
+    return () => {
+      try { evt.close(); } catch {}
+    };
+  }, [processedFiles]);
 
   // Tick every second to update countdown
   useEffect(() => {
@@ -415,43 +466,11 @@ export const MainPages = () => {
     }
   };
 
-  // Background service to check for new files every 10 minutes
-  const startBackgroundService = () => {
-    console.log('🚀 Starting background service...');
-    setBackgroundServiceStatus('running');
-    
-    // Clear any existing interval
-    if (window.backgroundServiceInterval) {
-      clearInterval(window.backgroundServiceInterval);
-    }
-    
-    // Run immediately once
-    processLatestFile();
-    // Schedule next check
-    setNextCheckAt(Date.now() + CHECK_INTERVAL_MS);
-    
-    // Clean up old processed files on startup
-
-    
-    // Then run every CHECK_INTERVAL_MS
-    window.backgroundServiceInterval = setInterval(() => {
-      console.log('⏰ Background service: Checking for new files...');
-      // compute the next check time at the start of this cycle
-      setNextCheckAt(Date.now() + CHECK_INTERVAL_MS);
-      processLatestFile();
-      
-      // Clean up old processed files every hour (6 intervals of 10 minutes)
-      const now = new Date();
-      if (now.getMinutes() < 10) {
-    
-      }
-    }, CHECK_INTERVAL_MS);
-  };
-
+  // Manual trigger for processing latest file (if needed)
   const processLatestFile = async () => {
     try {
       setBackgroundServiceStatus('checking');
-      console.log('🔍 Checking for latest file...');
+      console.log('🔍 Manually checking for latest file...');
       
       const { data } = await api.get('/api/sharepoint/input_files');
       const files = (data?.files || []).filter(item => {
@@ -469,12 +488,23 @@ export const MainPages = () => {
       files.sort((a,b) => new Date(b.lastModifiedDateTime || 0) - new Date(a.lastModifiedDateTime || 0));
       const latestFile = files[0];
 
-      // Backend will handle all de-duplication checks
-      
-      console.log('🆕 New file found, processing:', latestFile.name);
-      setBackgroundServiceStatus('processing');
-      
+      // Require HDA/hda in filename
+      if (!(latestFile?.name || '').toLowerCase().includes('hda')) {
+        console.log('⏭️ Skipping non-HDA file:', latestFile?.name);
+        setBackgroundServiceStatus('running');
+        return;
+      }
 
+      // Check if already processed
+      const fileKey = `${latestFile.id}_${latestFile.lastModifiedDateTime}`;
+      if (processedFiles.has(fileKey)) {
+        console.log('⏭️ File already processed:', latestFile?.name);
+        setBackgroundServiceStatus('running');
+        return;
+      }
+
+      console.log('🆕 Processing latest HDA file:', latestFile.name);
+      setBackgroundServiceStatus('processing');
 
       // Download and process the file
       const result = await downloadAndProcessFile(latestFile);
@@ -488,26 +518,28 @@ export const MainPages = () => {
       
       const outputFileName = generateReportFilename(latestFile?.name);
       
-      // Keep old tracking for backward compatibility
-      const fileKey = `${latestFile.id}_${latestFile.lastModifiedDateTime}`;
+      // Mark as processed
       setProcessedFiles(prev => new Set(prev).add(fileKey));
       setLastProcessedFile(latestFile);
       
       console.log('✅ File processed successfully:', latestFile.name, 'Output:', outputFileName);
+      await checkAvailableData(true);
       setBackgroundServiceStatus('running');
-      try { localStorage.removeItem('sla_processing_input_file'); } catch {}
       
     } catch (error) {
-      console.error('❌ Error in background processing:', error);
+      console.error('❌ Error in manual processing:', error);
       setBackgroundServiceStatus('error');
       // Reset to running after 1 minute
       setTimeout(() => setBackgroundServiceStatus('running'), 60000);
-      try { localStorage.removeItem('sla_processing_input_file'); } catch {}
     }
   };
 
   const downloadAndProcessFile = async (file) => {
     try {
+      // Require HDA/hda in filename before any processing
+      if (!((file?.name || '').toLowerCase().includes('hda'))) {
+        throw new Error('Skipping: filename does not contain HDA');
+      }
       if (!file['@microsoft.graph.downloadUrl']) {
         throw new Error('No download URL available for file');
       }
@@ -977,6 +1009,11 @@ export const MainPages = () => {
 
   const uploadProcessedFile = async (processedData, sourceFile) => {
     try {
+      // Enforce HDA filter again at upload stage
+      if (!((sourceFile?.name || '').toLowerCase().includes('hda'))) {
+        console.log('⏭️ Skip upload: non-HDA source');
+        return { skipped: true, reason: 'non_hda', message: 'Source file does not contain HDA' };
+      }
       console.log('📤 Uploading processed file to SharePoint...');
       
       const wb = XLSX.utils.book_new();
@@ -1785,13 +1822,21 @@ newRow[headerIndices.refinedpredt] =
 
 
 
-        {/* Background Service Status */}
+        {/* Real-time Processing Status */}
         {isSuperAdmin() && (
           <div className="mb-6">
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
               <div className="flex justify-between items-center mb-3">
-                <h3 className="text-md font-semibold text-gray-800">Background Service</h3>
+                <h3 className="text-md font-semibold text-gray-800">Real-time Processing</h3>
                 <div className="flex items-center space-x-3">
+                  <button
+                    onClick={processLatestFile}
+                    disabled={backgroundServiceStatus === 'processing' || backgroundServiceStatus === 'checking'}
+                    className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                    title="Manually check and process latest file"
+                  >
+                    Process Latest
+                  </button>
                   <button
                     onClick={() => {
                       setProcessedFiles(new Set());
@@ -1808,26 +1853,17 @@ newRow[headerIndices.refinedpredt] =
                       backgroundServiceStatus === 'processing' ? 'bg-blue-500 animate-pulse' :
                       backgroundServiceStatus === 'checking' ? 'bg-yellow-500 animate-pulse' :
                       backgroundServiceStatus === 'error' ? 'bg-red-500' :
-                      'bg-gray-500'
+                      'bg-green-500'
                     }`}></div>
-                    <span className="text-sm text-gray-600 capitalize">{backgroundServiceStatus}</span>
+                    <span className="text-sm text-gray-600">
+                      {backgroundServiceStatus === 'processing' ? 'Processing' : 
+                       backgroundServiceStatus === 'checking' ? 'Checking' : 'Monitoring'}
+                    </span>
                   </div>
                 </div>
               </div>
               <div className="text-sm text-gray-600">
-                <p>Automatically checks for new files every {Math.floor(CHECK_INTERVAL_MS / 60000)} minutes</p>
-                {nextCheckAt && (
-                  <p className="mt-1 text-gray-700">
-                    Next check in {
-                      (() => {
-                        const remaining = Math.max(0, nextCheckAt - nowTs);
-                        const m = String(Math.floor(remaining / 60000)).padStart(2, '0');
-                        const s = String(Math.floor((remaining % 60000) / 1000)).padStart(2, '0');
-                        return `${m}:${s}`;
-                      })()
-                    }
-                  </p>
-                )}
+                <p>Automatically processes new HDA files when detected</p>
                 <p className="text-xs text-gray-500 mt-1">
                   Processed {processedFiles.size} files
                 </p>
