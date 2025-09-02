@@ -616,56 +616,56 @@ export const MainPages = () => {
     if (!name || typeof name !== 'string') return null;
     const base = name.replace(/\.[^.]+$/, '');
 
-    // 1) DD[-_\/]MM[-_\/]YYYY[ _-]HH[-:]MM[-:]SS -> DDMMYYYY_HHMMSS
+    // 1) DD[-_\/]MM[-_\/]YYYY[ _-]HH[-:]MM[-:]SS -> YYYYMMDD_HHMMSS
     let m = base.match(/(\d{2})[-_\/]?(\d{2})[-_\/]?(\d{4})[\s_-]?(\d{2})[-_:]?(\d{2})[-_:]?(\d{2})/);
     if (m) {
       const [_, dd, mm, yyyy, hh, mi, ss] = m;
-      return `${dd}${mm}${yyyy}_${hh}${mi}${ss}`;
+      return `${yyyy}${mm}${dd}_${hh}${mi}${ss}`;
     }
 
-    // 2) YYYY[-_\/]MM[-_\/]DD[ _-]HH[-:]MM[-:]SS -> DDMMYYYY_HHMMSS
+    // 2) YYYY[-_\/]MM[-_\/]DD[ _-]HH[-:]MM[-:]SS -> YYYYMMDD_HHMMSS
     m = base.match(/(\d{4})[-_\/]?(\d{2})[-_\/]?(\d{2})[\s_-]?(\d{2})[-_:]?(\d{2})[-_:]?(\d{2})/);
     if (m) {
       const [_, yyyy, mm, dd, hh, mi, ss] = m;
-      return `${dd}${mm}${yyyy}_${hh}${mi}${ss}`;
+      return `${yyyy}${mm}${dd}_${hh}${mi}${ss}`;
     }
 
-    // 3) Compact date with separated time: DDMMYYYY[ _-]HH[-:]MM[-:]SS -> DDMMYYYY_HHMMSS
+    // 3) Compact date with separated time: DDMMYYYY[ _-]HH[-:]MM[-:]SS -> YYYYMMDD_HHMMSS
     m = base.match(/(\d{2})(\d{2})(\d{4})[\s_-]?(\d{2})[-_:]?(\d{2})[-_:]?(\d{2})/);
     if (m) {
       const [_, dd, mm, yyyy, hh, mi, ss] = m;
-      return `${dd}${mm}${yyyy}_${hh}${mi}${ss}`;
+      return `${yyyy}${mm}${dd}_${hh}${mi}${ss}`;
     }
 
-    // 4) Compact date/time: YYYYMMDD[ _-]HH[-:]MM[-:]SS -> DDMMYYYY_HHMMSS
+    // 4) Compact date/time: YYYYMMDD[ _-]HH[-:]MM[-:]SS -> YYYYMMDD_HHMMSS
     m = base.match(/(\d{4})(\d{2})(\d{2})[\s_-]?(\d{2})[-_:]?(\d{2})[-_:]?(\d{2})/);
     if (m) {
       const [_, yyyy, mm, dd, hh, mi, ss] = m;
-      return `${dd}${mm}${yyyy}_${hh}${mi}${ss}`;
+      return `${yyyy}${mm}${dd}_${hh}${mi}${ss}`;
     }
 
     // Date-only variants -> append _000000
     m = base.match(/(\d{2})[-_\/]?(\d{2})[-_\/]?(\d{4})/);
     if (m) {
       const [_, dd, mm, yyyy] = m;
-      return `${dd}${mm}${yyyy}_000000`;
+      return `${yyyy}${mm}${dd}_000000`;
     }
     m = base.match(/(\d{4})[-_\/]?(\d{2})[-_\/]?(\d{2})/);
     if (m) {
       const [_, yyyy, mm, dd] = m;
-      return `${dd}${mm}${yyyy}_000000`;
+      return `${yyyy}${mm}${dd}_000000`;
     }
     // Compact date-only DDMMYYYY
     m = base.match(/(\d{2})(\d{2})(\d{4})/);
     if (m) {
       const [_, dd, mm, yyyy] = m;
-      return `${dd}${mm}${yyyy}_000000`;
+      return `${yyyy}${mm}${dd}_000000`;
     }
     // Compact date-only YYYYMMDD
     m = base.match(/(\d{4})(\d{2})(\d{2})/);
     if (m) {
       const [_, yyyy, mm, dd] = m;
-      return `${dd}${mm}${yyyy}_000000`;
+      return `${yyyy}${mm}${dd}_000000`;
     }
     return null;
   };
