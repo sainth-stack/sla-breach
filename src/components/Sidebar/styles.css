@@ -1,28 +1,26 @@
+/* --- Professional Blue Sidebar --- */
+
 /* Main Container */
 .main-container {
   width: 100%;
-  background-color: #f8f9fa;
-  /* height: 87vh; */
-  /* position: fixed; */
-  /* top: 0;
-  left: 0;
-  right: 0;
-  z-index: 1000;   */
+  background: #f8fafc;
+  min-height: 100vh;
 }
 
 /* Sidebar Container */
 .sidebar {
   position: fixed;
   left: 0;
-  top: 0 !important;
+  top: 80px;
   width: 280px;
-  height: 100vh;
-  z-index: 9999;
+  height: calc(100vh - 80px);
+  z-index: 1000;
   overflow-y: auto;
-  background: #ffffff;
+  background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
+  box-shadow: 2px 0 10px rgba(59, 130, 246, 0.15);
+  display: flex;
+  flex-direction: column;
   padding: 20px 0;
-  box-shadow: 2px 0 20px rgba(0, 0, 0, 0.06);
-  border-right: 1px solid #eaeaea;
 }
 
 /* Sidebar List */
@@ -30,60 +28,147 @@
   list-style: none;
   padding: 0;
   margin: 0;
+  width: 100%;
+}
+
+/* Sidebar Section */
+.sidebar-section {
+  margin-bottom: 20px;
+}
+
+/* Section Header */
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 15px 20px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  backdrop-filter: blur(10px);
+  font-weight: 600;
+  font-size: 14px;
+  color: white;
+  text-transform: uppercase;
+  cursor: pointer;
+  border: none;
+  margin: 0 15px 10px 15px;
+  transition: background 0.2s ease;
+}
+.section-header:hover {
+  background: rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(15px);
+}
+
+.section-title {
+  text-align: start;
+  flex: 1;
+}
+
+.chevron-icon {
+  color: rgba(255, 255, 255, 0.8);
+  transition: color 0.2s ease;
+}
+.section-header:hover .chevron-icon {
+  color: white;
 }
 
 /* Sidebar Items */
 .sidebar-item {
-  padding: 14px 24px;
-  margin: 4px 12px;
-  border-radius: 8px;
-  transition: all 0.3s ease;
-  cursor: pointer;
+  margin: 0;
 }
 
-/* Sidebar Links */
+/* Sidebar Link */
 .sidebar-link {
   display: flex;
   align-items: center;
+  width: 100%;
   text-decoration: none;
-  color: #4a5568;
+  color: rgba(255, 255, 255, 0.9);
   font-size: 15px;
   font-weight: 500;
-  transition: all 0.3s ease;
+  padding: 12px 20px;
+  border-radius: 8px;
+  background: transparent;
+  transition: all 0.2s ease;
+  outline: none;
+  border: none;
+  margin: 0 15px;
 }
 
-/* Link Icon */
-.sidebar-link svg {
-  margin-right: 12px;
-  color: #6b7280;
-  font-size: 20px;
-  transition: all 0.3s ease;
+/* Hover State */
+.sidebar-link:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: white;
+  backdrop-filter: blur(10px);
+  transform: translateX(2px);
 }
 
-/* Hover Effect */
-.sidebar-item:hover {
-  background: #f7f9fc;
-  transform: translateX(4px);
-}
-
-.sidebar-item:hover .sidebar-link {
-  color: #2563eb;
-}
-
-.sidebar-item:hover svg {
-  color: #2563eb;
-}
-
-/* Active Item */
-.sidebar-item.active {
-  background: #eef2ff;
-  border-left: none;
-}
-
+/* Active State */
 .sidebar-item.active .sidebar-link {
-  color: #2563eb;
+  color: #3b82f6;
+  background: white;
+  font-weight: 600;
 }
 
-.sidebar-item.active svg {
-  color: #2563eb;
+/* Subsection List */
+.subsection-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  background: transparent;
 }
+
+/* Subsection Items */
+.sidebar-item.subsection .sidebar-link {
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.8);
+  background: transparent;
+  margin: 0 15px;
+  border-radius: 6px;
+  padding: 10px 25px;
+}
+.sidebar-item.subsection.active .sidebar-link {
+  background: white;
+  color: #3b82f6;
+  font-weight: 600;
+}
+.sidebar-item.subsection:hover .sidebar-link {
+  background: rgba(255, 255, 255, 0.12);
+  color: white;
+  backdrop-filter: blur(10px);
+  transform: translateX(2px);
+}
+
+/* Link Text */
+.link-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Scrollbar Styling */
+.sidebar::-webkit-scrollbar {
+  width: 6px;
+}
+.sidebar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+}
+.sidebar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .sidebar {
+    width: 100%;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+  }
+  .sidebar.open {
+    transform: translateX(0);
+  }
+}
+
+/* --- End Professional Blue Sidebar --- */

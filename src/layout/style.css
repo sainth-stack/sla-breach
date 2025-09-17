@@ -1,7 +1,17 @@
 .main-content2{
-    /* height: 90vh !important; */
     overflow: auto;
     overflow-x:hidden;
-    height: calc(100vh - 10px);
-    /* margin-left: 280px; */
+    height: calc(100vh - 70px);
+    margin-top: 70px;
+    margin-left: 260px;
+    width: calc(100% - 260px);
+}
+
+@media (max-width: 768px) {
+    .main-content2 {
+        margin-left: 0;
+        width: 100%;
+        margin-top: 60px;
+        height: calc(100vh - 60px);
+    }
 }

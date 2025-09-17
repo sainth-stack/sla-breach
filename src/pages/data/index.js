@@ -1,807 +1,291 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Papa from "papaparse";
-import "./index.css";
-import { LLMConfig } from "../llm-config";
-import * as XLSX from 'xlsx';
+import * as XLSX from "xlsx";
+import Report from "./report";
+import { baseURL } from "../../const";
+import { processFileData, HOLIDAYS_BY_YEAR, YELLOW_FIELDS } from "../../utils/dataProcessor";
+import FloatingChatBot from "../../components/ChatBot/FloatingChatBot";
+
+// Note: Most utility functions are now imported from dataProcessor.js
 
 export const MainPages = () => {
   const [csvData, setCsvData] = useState(null);
-  const [csvData2, setCsvData2] = useState(null);
-  const [dateColumns, setDateColumns] = useState(
-    "Creation Time,Historical Status - Change Time"
-  );
-  const [file, setFile] = useState(null);
-  const [filters, setFilters] = useState({
-    ticket: '',
-    assignedTo: '',
-    priority: '',
-    allowedDuration: '',
-    breached: '',
-    status: '',
-    creationDateFrom: '',
-    creationDateTo: '',
-    timeToBreachOption: 'eq',
-    timeToBreachValue: ''
-  });
-  const calculateWorkingHours = (data1) => {
-    console.log(data1)
-    const addColumns = (data) => {
-        // Add only Change column
-        const changeIndex = data[0].length;
-        
-        // Add header
-        data[0][changeIndex] = "Change";
-        
-        // Add empty values for all rows
-        for (let i = 1; i < data.length; i++) {
-            data[i][changeIndex] = "";
-        }
-        return data;
-    };
+  const [isLoading, setIsLoading] = useState(true);
+  const [holidays, setHolidays] = useState([]);
+  const [error, setError] = useState(null);
 
-    const data = addColumns(data1);
-
-    const workingHoursStart = 14; // 2 PM
-    const workingHoursEnd = 23; // 11 PM
-
-    const parseDateTime = (dateTimeString, timeStr) => {
-        try {
-            // Case 1: When date and time are passed separately (original CSV format)
-            if (timeStr !== undefined) {
-                const [day, month, year] = dateTimeString.split("/");
-                const [hours, minutes] = timeStr.split(":");
-                return new Date(`20${year}`, month - 1, day, parseInt(hours, 10), parseInt(minutes, 10), 0);
-            }
-
-            // Case 2: When it's a combined string (CSV format "DD/MM/YY HH:MM")
-            if (typeof dateTimeString === 'string' && dateTimeString.includes('/')) {
-                const [datePart, timePart] = dateTimeString.split(" ");
-                const [day, month, year] = datePart.split("/");
-                const [hours, minutes] = timePart.split(":");
-                return new Date(`20${year}`, month - 1, day, parseInt(hours, 10), parseInt(minutes, 10), 0);
-            }
-
-            // Case 3: When it's an Excel date (number or Date object)
-            if (dateTimeString instanceof Date) {
-                return dateTimeString;
-            }
-            if (typeof dateTimeString === 'number') {
-                return new Date(Math.round((dateTimeString - 25569) * 86400 * 1000));
-            }
-
-            // Fallback: Try to parse as is
-            return new Date(dateTimeString);
-        } catch (error) {
-            console.error("Error parsing date:", error, "Input:", dateTimeString, timeStr);
-            return new Date(); // Return current date as fallback
-        }
-    };
-
-    const isWeekend = (date) => {
-        const day = date.getDay();
-        return day === 0 || day === 6; // 0 is Sunday, 6 is Saturday
-    };
-
-    const calculateTimeDifference = (startDateTime, endDateTime) => {
-        let start = new Date(startDateTime);
-        let end = new Date(endDateTime);
-        let reason = [];
-        let totalHours = 0;
-
-        // If same day and both on weekend
-        if (start.toDateString() === end.toDateString() && isWeekend(start)) {
-            reason.push("Weekend day - no hours counted");
-            return { hours: 0, reason: reason.join(". "), start, end };
-        }
-
-        // Iterate through each day between start and end
-        let currentDate = new Date(start);
-        while (currentDate <= end) {
-            if (!isWeekend(currentDate)) {
-                let dayStart = new Date(currentDate);
-                let dayEnd = new Date(currentDate);
-                
-                // Set working hours boundaries
-                dayStart.setHours(workingHoursStart, 0, 0);
-                dayEnd.setHours(workingHoursEnd, 0, 0);
-
-                // Adjust start time for first day
-                if (currentDate.toDateString() === start.toDateString()) {
-                    if (start.getHours() >= workingHoursEnd) {
-                        // Skip this day if start is after working hours
-                        currentDate.setDate(currentDate.getDate() + 1);
-                        continue;
-                    }
-                    dayStart = start.getHours() < workingHoursStart ? dayStart : start;
-                }
-
-                // Adjust end time for last day
-                if (currentDate.toDateString() === end.toDateString()) {
-                    if (end.getHours() < workingHoursStart) {
-                        break;
-                    }
-                    dayEnd = end.getHours() >= workingHoursEnd ? dayEnd : end;
-                }
-
-                // Calculate hours for this day
-                if (dayEnd > dayStart) {
-                    const diffMs = dayEnd - dayStart;
-                    const hoursToday = diffMs / (1000 * 60 * 60);
-                    totalHours += hoursToday;
-                }
-            }
-
-            // Move to next day
-            currentDate.setDate(currentDate.getDate() + 1);
-        }
-
-        // Add explanation to reason
-        if (totalHours > 0) {
-            if (isWeekend(start)) {
-                reason.push("Start date was on weekend - counting started from next working day");
-            }
-            if (isWeekend(end)) {
-                reason.push("End date was on weekend - counting ended on previous working day");
-            }
-            reason.push("Counted working hours between valid working days");
-        } else {
-            reason.push("No valid working hours found between dates");
-        }
-
-        return {
-            hours: totalHours,
-            reason: reason.join(". "),
-            start,
-            end
-        };
-    };
-
-    // Group by ticket ID and status
-    const ticketGroups = {};
-    for (let i = 1; i < data.length; i++) {
-        const row = data[i];
-        const ticketId = row[3]; // Request-ID column
-        const statusFrom = row[5]; // Historical Status - Status From
-        const statusTo = row[6];   // Historical Status - Status To
-        
-        if (!ticketGroups[ticketId]) {
-            ticketGroups[ticketId] = [];
-        }
-        ticketGroups[ticketId].push({
-            row: row,
-            date: parseDateTime(row[7], row[8]),
-            statusFrom: statusFrom,
-            statusTo: statusTo
-        });
-    }
-    // Process each ticket's records
-    for (const ticketId in ticketGroups) {
-        const records = ticketGroups[ticketId].sort((a, b) => a.date - b.date);
-
-        for (let i = 0; i < records.length; i++) {
-            const currentRecord = records[i];
-            let result = { hours: 0, reason: "", start: null, end: null };
-
-            if (i === 0) {
-                if (currentRecord.date.getHours() >= workingHoursStart) {
-                    const startTime = new Date(currentRecord.date);
-                    startTime.setHours(workingHoursStart, 0, 0);
-                    result = calculateTimeDifference(startTime, currentRecord.date);
-                } else {
-                    result.reason = "First record before working hours";
-                    result.start = currentRecord.date;
-                    result.end = currentRecord.date;
-                }
-            } else {
-                const prevRecord = records[i - 1];
-                result = calculateTimeDifference(prevRecord.date, currentRecord.date);
-            }
-
-            // Format the time
-            const hours = Math.floor(result.hours);
-            const minutes = Math.round((result.hours - hours) * 60);
-            
-            // Find the index for Change column
-            const changeIndex = currentRecord.row.length - 1;
-            
-            // Set the Change column
-            currentRecord.row[changeIndex] = 
-                `${hours}:${minutes.toString().padStart(2, '0')} h`;
-        }
-    }
-console.log(data)
-    updateTemplate(data);
-};
-
-
-const allowedHeaders = [
-  "Req. Creation Date",
-  "Creation Time",
-  "Request - ID",
-  "Request - Priority Description",
-  "Historical Status - Status From",
-  "Historical Status - Status To",
-  "Historical Status - Change Date",
-  "Historical Status - Change Time",
-  "Macro Area - Name",
-  "Request - Resource Assigned To - Name",
-  "Req. Status - Description",
-  "Change",
-  // "Details"
-];
-
-const updateTemplate = (data) => {
-  // Extract headers and values
-  const headers = data[0]; // First row contains headers
-  const values = data.slice(1); // Remaining rows contain values
-
-  // Get the indices of required headers
-  const allowedIndices = headers
-    .map((header, index) => (allowedHeaders.includes(header) ? index : -1))
-    .filter(index => index !== -1); // Remove -1 (unwanted headers)
-
-  // Create filtered data with only allowed columns
-  const filteredData = values.map(row => allowedIndices.map(index => row[index]));
-
-
-const validTransitions = [
-  "Forwarded to Assigned",
-  "Forwarded to Work in progress",
-  "Assigned to Work in progress",
-  "Work in progress to Suspended",
-  "Work in progress to Solved",
-  "Suspended to Solved",
-  "Forwarded to Suspended"
-];
-
-const statusFromIndex = headers.indexOf("Historical Status - Status From")-1;
-const statusToIndex = headers.indexOf("Historical Status - Status To")-1;
-console.log(statusFromIndex,statusToIndex)
-  const finalData=[...filteredData].filter((item)=>{
-    const transition = `${item[statusFromIndex]} to ${item[statusToIndex]}`;
-if (validTransitions.includes(transition)) {
-  return true
-}
-  })
-console.log(finalData,'sss')
-  setCsvData([allowedHeaders,...finalData]);
-};
-
-
-  const handleFileUpload = (event) => {
-    setFile(event.target.files[0]);
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    // Handle different file types based on extension
-    const fileExtension = file?.name?.split('.').pop().toLowerCase();
-
-    if (fileExtension === 'csv') {
-      Papa.parse(file, {
-        complete: (result) => {
-          calculateWorkingHours(sortData(adjustDateColumns(result.data, dateColumns)));
-        },
-        error: (error) => {
-          console.error("Error parsing CSV:", error);
-        },
-        skipEmptyLines: true,
-      });
-    } else if (['xlsx', 'xls'].includes(fileExtension)) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const data = e.target.result;
-        const workbook = XLSX.read(data, { type: 'array' });
-        const firstSheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[firstSheetName];
-        const excelData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-        calculateWorkingHours(sortData(adjustDateColumns(excelData, dateColumns)));
-      };
-      reader.readAsArrayBuffer(file);
-    } else {
-      console.error("Unsupported file type");
-    }
-  };
-
-const sortData = (data) => {
-
-    const header = data[0];
-    const rows = data.slice(1);
-
-    const groupedData = rows.reduce((acc, row) => {
-        if (!acc[row[3]]) acc[row[3]] = [];
-        acc[row[3]].push(row);
-        return acc;
-    }, {});
-
-
-    Object.keys(groupedData).forEach(id => {
-        groupedData[id].sort((a, b) => {
-            const dateA = parseDateTime(`${a[7]} ${a[8]}`);
-            const dateB = parseDateTime(`${b[7]} ${b[8]}`);
-            return dateA - dateB;
-        });
-    });
-
-    const sortedData = [header, ...Object.values(groupedData).flat()];
-
-    return sortedData;
-};
-
-
-const parseDateTime = (dateTimeString, timeStr) => {
+  // Function to load data by filename from API
+  const loadDataByFilename = async (filename) => {
+    setIsLoading(true);
+    setError(null);
+    
     try {
-        // Case 1: When date and time are passed separately (original CSV format)
-        if (timeStr !== undefined) {
-            const [day, month, year] = dateTimeString.split("/");
-            const [hours, minutes] = timeStr.split(":");
-            return new Date(`20${year}`, month - 1, day, parseInt(hours, 10), parseInt(minutes, 10), 0);
+      const response = await fetch(`${baseURL}/get_csv_data/${filename}`);
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          setError(`File '${filename}' not found. Please check the filename and try again.`);
+        } else {
+          const errorData = await response.json();
+          setError(errorData.detail || 'Error loading data from server.');
         }
+        setIsLoading(false);
+        return false;
+      }
 
-        // Case 2: When it's a combined string (CSV format "DD/MM/YY HH:MM")
-        if (typeof dateTimeString === 'string' && dateTimeString.includes('/')) {
-            const [datePart, timePart] = dateTimeString.split(" ");
-            const [day, month, year] = datePart.split("/");
-            const [hours, minutes] = timePart.split(":");
-            return new Date(`20${year}`, month - 1, day, parseInt(hours, 10), parseInt(minutes, 10), 0);
-        }
-
-        // Case 3: When it's an Excel date (number or Date object)
-        if (dateTimeString instanceof Date) {
-            return dateTimeString;
-        }
-        if (typeof dateTimeString === 'number') {
-            return new Date(Math.round((dateTimeString - 25569) * 86400 * 1000));
-        }
-
-        // Fallback: Try to parse as is
-        return new Date(dateTimeString);
-    } catch (error) {
-        console.error("Error parsing date:", error, "Input:", dateTimeString, timeStr);
-        return new Date(); // Return current date as fallback
+      const data = await response.json();
+      
+      if (data.records && data.records.length > 0) {
+        // Convert the API response back to array format for processing
+        const headers = Object.keys(data.records[0]);
+        const rows = data.records.map(record => headers.map(header => record[header]));
+        const processedData = [headers, ...rows];
+        processData(processedData);
+        return true;
+      } else {
+        setError('No data found in the file. Please upload a valid file.');
+        setIsLoading(false);
+        return false;
+      }
+    } catch (err) {
+      console.error('Error loading data from API:', err);
+      setError('Error connecting to server. Please try again later.');
+      setIsLoading(false);
+      return false;
     }
-};
-
-
-
-
-  const handleDownload = () => {
-    if (!csvData) return;
-
-    const csvString = Papa.unparse(csvData);
-    const blob = new Blob([csvString], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "fileData.csv";
-    a.click();
-    URL.revokeObjectURL(url);
   };
 
-  const adjustDateColumns = (csvData, dateColumns) => {
-    if (!csvData || !dateColumns) return csvData;
-  
-    const columnNames = dateColumns.split(",").map((col) => col.trim());
-    const headers = csvData[0];
-  
-    const updatedData = csvData.map((row, rowIndex) => {
-      if (rowIndex === 0) return row; // Skip headers
-    
-      return row.map((cell, cellIndex) => {
-        const header = headers[cellIndex];
-        if (columnNames.includes(header)) {
-          try {
-            let totalHours, minutes, seconds;
-    
-            // Handle time strings in "HH:MM:SS" format
-            if (/^\d{1,2}:\d{1,2}:\d{1,2}$/.test(cell)) {
-              [totalHours, minutes, seconds] = cell.split(":").map(Number);
-            }
-            // Handle time strings in "HHMMSS" format (including 5-digit correction)
-            else if (/^\d{5,6}$/.test(cell)) {
-              let timeStr = cell.padStart(6, "0"); // Ensure it's 6 digits
-              totalHours = parseInt(timeStr.substring(0, 2), 10);
-              minutes = parseInt(timeStr.substring(2, 4), 10);
-              seconds = parseInt(timeStr.substring(4, 6), 10);
-            } else {
-              return cell; // Return original value if format is unrecognized
-            }
-    
-            // Format to HH:mm:ss
-            const formattedHours = String(totalHours).padStart(2, "0");
-            const formattedMinutes = String(minutes).padStart(2, "0");
-            const formattedSeconds = String(seconds).padStart(2, "0");
-    
-            return `${formattedHours}:${formattedMinutes}:${formattedSeconds}`;
-          } catch (error) {
-            console.error("Error parsing date:", error);
-          }
+  // Auto-load data from API on component mount
+  useEffect(() => {
+    const loadInitialData = async () => {
+      try {
+        // First check if we have an uploaded file info to get the filename
+        const uploadedFileInfo = localStorage.getItem('uploadedFile');
+        let filename = 'data1.csv'; // Default filename
+        
+        if (uploadedFileInfo) {
+          const fileInfo = JSON.parse(uploadedFileInfo);
+          // Use serverFilename if available, otherwise fallback to default
+          filename = fileInfo.serverFilename || 'data1.csv';
         }
-        return cell; // Return the cell as-is if it's not a date column or parsing fails
-      });
+
+        // Use the reusable function to load data
+        const success = await loadDataByFilename(filename);
+        if (!success) {
+          // Error handling is already done in loadDataByFilename
+          console.log('Failed to load initial data');
+        }
+      } catch (err) {
+        console.error('Error in initial data load:', err);
+        setError('Error loading initial data. Please try again.');
+        setIsLoading(false);
+      }
+    };
+
+    loadInitialData();
+  }, []);
+
+  // Simplified function since heavy lifting is done in the utility
+  const getHolidaysForYears = (years) => {
+    const uniqueYears = [...new Set(years)];
+    const allHolidays = [];
+    
+    uniqueYears.forEach(year => {
+      if (HOLIDAYS_BY_YEAR[year]) {
+        allHolidays.push(...HOLIDAYS_BY_YEAR[year]);
+      }
+    });
+    console.log(allHolidays,'all holidays')
+    return allHolidays;
+  };
+
+
+  const processData = (data) => {
+    if (!data || data.length === 0) return;
+    
+    // Use the utility function to process the data
+    const processedData = processFileData(data);
+    
+    if (!processedData || processedData.length === 0) {
+      setError('Failed to process data. Please check the file format.');
+      setIsLoading(false);
+      return;
+    }
+    
+    // Extract holidays from the processed data for state management
+    const [headers, ...rows] = processedData;
+    const years = [];
+    const reqCreationDateIndex = headers.indexOf("Req. Creation Date");
+    const historicalChangeDateIndex = headers.indexOf("Historical Status - Change Date");
+    
+    rows.forEach(row => {
+      if (reqCreationDateIndex !== -1 && row[reqCreationDateIndex]) {
+        const dateParts = row[reqCreationDateIndex].split('/');
+        if (dateParts.length === 3) {
+          years.push(dateParts[2]);
+        }
+      }
+      if (historicalChangeDateIndex !== -1 && row[historicalChangeDateIndex]) {
+        const dateParts = row[historicalChangeDateIndex].split('/');
+        if (dateParts.length === 3) {
+          years.push(dateParts[2]);
+        }
+      }
     });
     
-  
-    return updatedData;
+    const relevantHolidays = getHolidaysForYears(years);
+    setHolidays(relevantHolidays);
+
+    setCsvData(processedData);
+    setIsLoading(false);
   };
-  
-  const calculateReport = () => {
-    if (!csvData || csvData.length < 2) return null;
-    
-    const prioritySLA = {
-        "P1 - Critical": 4,
-        "P2 - High": 8,
-        "P3 - Normal": 45,
-        "P4 - Low": 90
-    };
 
+  // Build dataset for chatbot from processed table (grouped by ticket) - memoized
+  const chatDataset = useMemo(() => {
+    if (!csvData) return [];
+    try {
+      const [headers, ...rows] = csvData;
+      if (!headers || rows.length === 0) return [];
 
-    const headers = csvData[0];
-    const statusFromIndex = headers.indexOf("Historical Status - Status From");
-    const statusToIndex = headers.indexOf("Req. Status - Description");
-    const requestIdIndex = headers.indexOf("Request - ID");
-    const changeIndex = headers.indexOf("Change");
-    const ticketIndex = headers.indexOf("Request - ID");
-    const priorityIndex = headers.indexOf("Request - Priority Description");
-    const assignedTo = headers.indexOf("Request - Resource Assigned To - Name");
-    const creationDateIndex = headers.indexOf("Historical Status - Change Date");
-
-    // Group data by request ID (removed date filtering)
-    const groupedData = csvData.slice(1).reduce((acc, item) => {
-        const requestId = item[requestIdIndex];
-        if (!acc[requestId]) {
-            acc[requestId] = [];
-        }
- 
-            acc[requestId].push(item);
-        return acc;
-    }, {});
-
-    const reports = Object.entries(groupedData).map(([requestId, records]) => {
-        if(records?.length>0){
-            // ... rest of the report calculation logic remains the same ...
-            const lastRecord = records[records.length - 1];
-            const status = lastRecord?.length>0 ?lastRecord[statusToIndex]:'';
-            const priority = lastRecord[priorityIndex];
-            const slaHours = prioritySLA[priority] || 40;
-
-            const elapsedTime = records.reduce((sum, record) => {
-                const timeParts = record[changeIndex]?.split(':');
-                let timeInHours = 0;
-                if (timeParts?.length === 2) {
-                    const hours = parseInt(timeParts[0], 10) || 0;
-                    const minutes = parseInt(timeParts[1], 10) || 0;
-                    timeInHours = hours + minutes / 60;
-                } else {
-                    timeInHours = parseFloat(record[changeIndex]) || 0;
-                }
-                return sum + timeInHours;
-            }, 0);
-
-            const hours = Math.floor(elapsedTime);
-            const minutes = Math.round((elapsedTime - hours) * 60);
-            const formattedTime = `${hours}:${minutes.toString().padStart(2, '0')}`;
-
-            const timeToBreachHours = slaHours - elapsedTime;
-            const breachHours = Math.floor(Math.abs(timeToBreachHours));
-            const breachMinutes = Math.round((Math.abs(timeToBreachHours) - breachHours) * 60);
-            const timeToBreach = timeToBreachHours >= 0 
-                ? `${breachHours}:${breachMinutes.toString().padStart(2, '0')}`
-                : `0:00`;
-
-            return {
-                requestId,
-                ticket: lastRecord[ticketIndex],
-                priority,
-                status,
-                date:lastRecord[creationDateIndex],
-                elapsedTime: formattedTime,
-                breached: elapsedTime > slaHours,
-                totalTime: slaHours,
-                assignedTo: lastRecord[assignedTo],
-                timeToBreach
-            };
-        }
-    }).filter(Boolean); // Remove any undefined entries
-
-    return reports;
-};
-
-const getFilteredReport = () => {
-    if (!report) return [];
-    
-    const parseTimeToBreachValue = (timeStr) => {
-        timeStr = timeStr.replace(/\s*h\s*$/, '').trim();
-        const isNegative = timeStr.startsWith('-');
-        const hours = parseInt(timeStr.replace('-', '').split(':')[0], 10);
-        return isNegative ? -hours : hours;
-    };
-
-    return report
-        .filter(item => {
-            if (!item) return false;
-            
-            // Creation date filtering
-            if (filters.creationDateFrom || filters.creationDateTo) {
-                const creationDate = new Date(item.date.split('/').reverse().join('-'));
-                
-                if (filters.creationDateFrom) {
-                    const fromDate = new Date(filters.creationDateFrom);
-                    fromDate.setHours(0, 0, 0, 0);
-                    if (creationDate < fromDate) return false;
-                }
-
-                if (filters.creationDateTo) {
-                    const toDate = new Date(filters.creationDateTo);
-                    toDate.setHours(23, 59, 59, 999);
-                    if (creationDate > toDate) return false;
-                }
-            }
-
-            // Other filters remain the same
-            if (filters.ticket && item.requestId !== filters.ticket) return false;
-            if (filters.assignedTo && item.assignedTo !== filters.assignedTo) return false;
-            if (filters.priority && item.priority !== filters.priority) return false;
-            if (filters.breached && item.breached.toString() !== filters.breached) return false;
-            if (filters.status && item.status !== filters.status) return false;
-            
-            // Time to breach filtering
-            if (filters.timeToBreachValue) {
-                const itemHours = parseTimeToBreachValue(item.timeToBreach);
-                const filterHours = parseInt(filters.timeToBreachValue, 10);
-
-                switch (filters.timeToBreachOption) {
-                    case 'eq':
-                        if (itemHours !== filterHours) return false;
-                        break;
-                    case 'lte':
-                        if (itemHours > filterHours) return false;
-                        break;
-                    case 'gte':
-                        if (itemHours < filterHours) return false;
-                        break;
-                }
-            } 
-            return true;
-        })
-        .sort((a, b) => {
-            return parseTimeToBreachValue(a.timeToBreach) - parseTimeToBreachValue(b.timeToBreach);
-        });
-};
-
-      const parseDate = (dateStr) => {
-          if (!dateStr) return null;
-          
-          try {
-              // For DD/MM/YY format from CSV
-              if (dateStr.includes('/')) {
-                  const [day, month, year] = dateStr.split('/');
-                  const date = new Date(`20${year}`, month - 1, day);
-                  // Check if date is valid
-                  if (isNaN(date.getTime())) return null;
-                  return date;
-              }
-              
-              // For YYYY-MM-DD format from input date field
-              const date = new Date(dateStr);
-              // Check if date is valid
-              if (isNaN(date.getTime())) return null;
-              return date;
-          } catch (error) {
-              console.error('Error parsing date:', error);
-              return null;
-          }
+      const COLUMNS = {
+        CREATION_DATE: 0,
+        TICKET_ID: 3,
+        PRIORITY: 4,
+        STATUS_FROM: 5,
+        STATUS_TO: 6,
+        STATUS_CHANGE_DATE: 7,
+        MARCO: 9,
+        ASSIGNED_TO: 13,
+        CURRENT_STATUS: 15,
+        ELAPSED_TIME: 32,
+        resolSW: 33,
+        RESP_REM: 35,
+        REQ_STATUS: headers.indexOf("Req. Status - Description"),
+        RESOLUTION_DATE: headers.indexOf("Req. Resolution Date"),
+        REQUEST_TYPE: headers.indexOf("Req. Type - Description EN")
       };
 
-    const report = calculateReport();
+      const groups = new Map();
+      rows.forEach((row) => {
+        const id = row[COLUMNS.TICKET_ID];
+        if (!groups.has(id)) groups.set(id, []);
+        groups.get(id).push(row);
+      });
 
-  const getUniqueValues = (data, key) => {
-    if (!data) return [];
-    return [...new Set(data.filter(item => item).map(item => item[key]))];
-  };
+      const dataset = [];
+      for (const [, ticketRows] of groups) {
+        const lastRow = ticketRows[ticketRows.length - 1];
+        const respRemVal = parseFloat(lastRow?.[COLUMNS.RESP_REM]);
+        dataset.push({
+          ticketId: lastRow?.[COLUMNS.TICKET_ID],
+          creationDate: lastRow?.[COLUMNS.CREATION_DATE],
+          priority: lastRow?.[COLUMNS.PRIORITY],
+          assignedTo: lastRow?.[COLUMNS.ASSIGNED_TO],
+          marconaName: lastRow?.[COLUMNS.MARCO],
+          currentStatus: lastRow?.[COLUMNS.CURRENT_STATUS],
+          elapsedTime: lastRow?.[COLUMNS.ELAPSED_TIME],
+          isBreached: !isNaN(respRemVal) ? respRemVal < 0 : false,
+          status: COLUMNS.REQ_STATUS !== -1 ? lastRow?.[COLUMNS.REQ_STATUS] : undefined,
+          resolutionDate: COLUMNS.RESOLUTION_DATE !== -1 ? lastRow?.[COLUMNS.RESOLUTION_DATE] : undefined,
+          timeToBreach: lastRow?.[COLUMNS.RESP_REM],
+          totalTime: lastRow?.[COLUMNS.resolSW],
+          requestType: COLUMNS.REQUEST_TYPE !== -1 ? lastRow?.[COLUMNS.REQUEST_TYPE] : undefined,
+        });
+      }
+      return dataset;
+    } catch (e) {
+      console.error('Failed to build chat dataset:', e);
+      return [];
+    }
+  }, [csvData]);
+
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex justify-center items-center p-6">
+        <div className="w-full max-w-md bg-white rounded-xl shadow-lg p-8 text-center">
+          <div className="flex justify-center mb-4">
+            <svg
+              className="animate-spin h-12 w-12 text-indigo-600"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              ></circle>
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              ></path>
+            </svg>
+          </div>
+          <h2 className="text-xl font-bold text-gray-800 mb-2">Processing Data</h2>
+          <p className="text-gray-600">Please wait while we load and process your SLA data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex justify-center items-center p-6">
+        <div className="w-full max-w-md bg-white rounded-xl shadow-lg p-8 text-center">
+          <div className="flex justify-center mb-4">
+            <svg className="h-12 w-12 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 18.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-bold text-gray-800 mb-2">No Data Available</h2>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <button
+            onClick={() => window.location.href = '/data-source'}
+            className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors duration-200 font-semibold"
+          >
+            Go to Data Source
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="p-2 flex flex-col gap-2 items-start">
-      <div className="card2">
-        <h1 className="heading">SLA Breach</h1>
-        <div className="upload-section2">
-          <input
-            type="file"
-            accept=".csv,.xlsx,.xls"
-            onChange={handleFileUpload}
-            className="file-input2"
-          />
+    <div className="min-h-screen bg-gray-100 flex justify-center p-6">
+      <div className="w-full bg-white rounded-xl shadow-lg p-8">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold text-blue-800">
+            SLA Monitoring
+          </h1>
+
         </div>
-        <div className="column-input-section">
-          {csvData && (
-            <div className="data-section">
-              <button onClick={handleDownload} className="download-button">
-                Download File
-              </button>
-              <div className="table-wrapper">
-                <table className="table">
-                  <thead>
-                    <tr>
-                      {csvData[0]?.map((header, index) => (
-                        <th key={index} className="table-header">
-                          {header}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {csvData.slice(1).map((row, rowIndex) => (
-                      <tr key={rowIndex}>
-                        {row.map((cell, cellIndex) => (
-                          <td key={cellIndex} className="table-cell">
-                            {cell}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </div>
-        {report && report?.length > 0 && (
-          <div className="report-section">
-            <h2 className="report-heading">Report</h2>
-            <div className="filters-container grid grid-cols-4 gap-4 mb-4">
-              <div>
-                <label>Creation Date From:</label>
-                <input 
-                  type="date" 
-                  value={filters.creationDateFrom}
-                  onChange={(e) => setFilters({...filters, creationDateFrom: e.target.value})}
-                  className="w-full p-2 border rounded"
-                />
-              </div>
 
-              <div>
-                <label>Creation Date To:</label>
-                <input 
-                  type="date" 
-                  value={filters.creationDateTo}
-                  onChange={(e) => setFilters({...filters, creationDateTo: e.target.value})}
-                  className="w-full p-2 border rounded"
-                />
-              </div>
-
-              <div>
-                <label>Priority:</label>
-                <select 
-                  value={filters.priority} 
-                  onChange={(e) => setFilters({...filters, priority: e.target.value})}
-                  className="w-full p-2 border rounded"
-                >
-                  <option value="">All</option>
-                  {getUniqueValues(report, 'priority').map(priority => (
-                    <option key={priority} value={priority}>{priority}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex gap-2 items-end">
-                <div>
-                  <label>Time to Breach:</label>
-                  <select 
-                    value={filters.timeToBreachOption} 
-                    onChange={(e) => setFilters({...filters, timeToBreachOption: e.target.value})}
-                    className="w-full p-2 border rounded"
-                  >
-                    <option value="eq">Equal to</option>
-                    <option value="lte">Less than or equal to</option>
-                    <option value="gte">Greater than or equal to</option>
-                  </select>
-                </div>
-                <div>
-                  <input 
-                    type="number" 
-                    value={filters.timeToBreachValue}
-                    onChange={(e) => setFilters({...filters, timeToBreachValue: e.target.value})}
-                    placeholder="Enter hours"
-                    className="w-full p-2 border rounded"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label>Ticket:</label>
-                <select 
-                  value={filters.ticket} 
-                  onChange={(e) => setFilters({...filters, ticket: e.target.value})}
-                  className="w-full p-2 border rounded"
-                >
-                  <option value="">All</option>
-                  {getUniqueValues(report, 'requestId').map(ticket => (
-                    <option key={ticket} value={ticket}>{ticket}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label>Assigned To:</label>
-                <select 
-                  value={filters.assignedTo} 
-                  onChange={(e) => setFilters({...filters, assignedTo: e.target.value})}
-                  className="w-full p-2 border rounded"
-                >
-                  <option value="">All</option>
-                  {getUniqueValues(report, 'assignedTo').map(name => (
-                    <option key={name} value={name}>{name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label>Status:</label>
-                <select 
-                  value={filters.status} 
-                  onChange={(e) => setFilters({...filters, status: e.target.value})}
-                  className="w-full p-2 border rounded"
-                >
-                  <option value="">All</option>
-                  {getUniqueValues(report, 'status').map(status => (
-                    <option key={status} value={status}>{status}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label>Breached:</label>
-                <select 
-                  value={filters.breached} 
-                  onChange={(e) => setFilters({...filters, breached: e.target.value})}
-                  className="w-full p-2 border rounded"
-                >
-                  <option value="">All</option>
-                  <option value="true">Yes</option>
-                  <option value="false">No</option>
-                </select>
-              </div>
-            </div>
-            
-            {/* Add total records count */}
-            <div className="mb-4 text-sm font-medium">
-              Total Records: {getFilteredReport().length}
-            </div>
-            
-            <table>
-              <thead>
-                <tr>
-                  <th>Ticket</th>
-                  <th>Assigned To</th>
-                  <th>Priority</th>
-                  <th>Elapsed Time</th>
-                  <th>Time to Breach</th>
-                  <th>Breached</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {getFilteredReport().map((item, index) => {
-                   return(
-                    <>
-                     {item &&
-                      <tr key={index}>
-                        <td>{item.requestId}</td>
-                        <td>{item.assignedTo}</td>
-                        <td>{item.priority}</td>
-                        <td>{item.elapsedTime} h</td>
-                        <td>{item.timeToBreach} h</td>
-                        <td>{item.breached ? "Yes" : "No"}</td>
-                        <td>{item.status}</td>
-                      </tr>
-                }
-                    </>
-                   )
-                })}
-              </tbody>
-            </table>
+        {csvData && (
+          <div className="space-y-6">
+            <Report data={csvData}/>
           </div>
         )}
-      </div> 
+      </div>
+      
+      {/* Floating Chat Bot */}
+      {csvData && (
+        <FloatingChatBot
+          title="SLA Data Analysis"
+          subtitle="Ask questions about your SLA data"
+          placeholder="Ask about SLA metrics, trends, performance..."
+          endpoint="/Explore_sla/"
+          initialMessage="Hello! I can help you analyze your SLA data. You can ask me about metrics, trends, performance issues, and get detailed insights from your uploaded data. What would you like to explore?"
+          showFileInfo={true}
+          showSessionInfo={true}
+          className="sla-data-chatbot"
+          dataset={chatDataset}
+        />
+      )}
     </div>
   );
 };

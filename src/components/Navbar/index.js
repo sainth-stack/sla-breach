@@ -1,54 +1,41 @@
-/* eslint-disable no-unused-vars */
-import React, { useEffect, useState, useRef } from "react";
-// import "./styles.scss";
-// import userprofile from '../../assets/images/userprofile.png'
-import { useNavigate } from "react-router-dom";
-// import Logo from '../../assets/images/logo3.png'
-import { AiTwotoneCalendar } from 'react-icons/ai'
-import { useLocation } from "react-router-dom";
-function Navbar() {
-  const navigate = useNavigate()
-  const [name, setName] = useState("Dashboard")
-  const handleLogout = () => {
-    localStorage.removeItem("token")
-    navigate('/login')
-  }
-  let location = useLocation();
-  useEffect(() => {
-    if (location.pathname == '/productivity') {
-      setName("Productivity")
-    } else if (location.pathname == '/resilience') {
-      setName("Resilience")
-    } else if (location.pathname == '/sustainability') {
-      setName("Sustainability")
-    } else if (location.pathname == '/reports' || location.pathname=='/review-report') {
-      setName("Reports")
-    } else {
-      setName("KProcess")
-    }
-  }, [location.pathname])
+import React, { useEffect } from 'react';
+import './styles.css';
+import lg1Logo from '../../assets/lg1.png';
+import lg2Logo from '../../assets/lg2.png';
 
+const Navbar = () => {
+  useEffect(() => {
+    console.log('Navbar component mounted');
+    console.log('lg1Logo path:', lg1Logo);
+    console.log('lg2Logo path:', lg2Logo);
+    
+    // Check if images loaded successfully
+    const img1 = new Image();
+    const img2 = new Image();
+    
+    img1.onload = () => console.log('lg1 logo loaded successfully');
+    img1.onerror = () => console.error('Failed to load lg1 logo');
+    img1.src = lg1Logo;
+    
+    img2.onload = () => console.log('lg2 logo loaded successfully');
+    img2.onerror = () => console.error('Failed to load lg2 logo');
+    img2.src = lg2Logo;
+  }, []);
 
   return (
-    <>
-      <nav class="navbar navbar-expand-lg  navbar-light bg-white shadow-sm sticky-top bg-white-fixed">
-        <div class="collapse navbar-collapse" style={{ marginLeft: '0px',paddingLeft:'40px'}} id="navbarNav">
-          {/* <img
-            src={Logo}
-            style={{ width: '70px',height:'70px' }}
-            id="logo_RL"
-          /> */}
+    <nav className="top-navbar">
+      <div className="navbar-content">
+        <div className="navbar-left">
+          <img src={lg1Logo} alt="Logo 1" className="navbar-logo-left" />
         </div>
-
-        <div className="position-absolute w-100 d-flex justify-content-center" style={{ pointerEvents: 'none' }}>
-          {/* <h2 style={{fontSize:'30px',fontWeight:'bold'}} className="m-0">DataPX1</h2> */}
+      
+        
+        <div className="navbar-right">
+          <img src={lg2Logo} alt="Logo 2" className="navbar-logo-right" />
         </div>
-
-  
-      </nav>
-    </>
-
+      </div>
+    </nav>
   );
+};
 
-}
 export default Navbar;

@@ -78,7 +78,7 @@
   .column-input-section {
     margin: 20px 0;
     text-align: center;
-    margin-left: 280px;
+    /* margin-left: 280px; */
   }
   
   .column-label {
@@ -211,7 +211,7 @@
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     margin: 2rem auto;
     max-width: 1300px;
-    margin-left: 280px !important;
+    /* margin-left: 280px !important; */
   }
   
   .report-heading {
