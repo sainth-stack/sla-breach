@@ -20,7 +20,7 @@
   box-shadow: 2px 0 10px rgba(59, 130, 246, 0.15);
   display: flex;
   flex-direction: column;
-  padding: 20px 0;
+  padding: 10px 0;
 }
 
 /* Sidebar List */
@@ -33,7 +33,59 @@
 
 /* Sidebar Section */
 .sidebar-section {
-  margin-bottom: 20px;
+  margin-bottom: 8px;
+}
+
+/* Main Section (AMS ProEn) */
+.sidebar-section.main-section {
+  margin-bottom: 0;
+}
+
+/* Main Content Container */
+.main-content {
+  padding-left: 0;
+  margin-top: 5px;
+}
+
+/* Main Content Sections */
+.main-content .sidebar-section {
+  margin-left: 15px;
+  margin-bottom: 6px;
+}
+
+.main-content .sidebar-section .section-header {
+  margin: 0 5px 3px 5px;
+  font-size: 12px;
+  padding: 8px 12px;
+}
+
+/* Main Content Subsection Links */
+.main-content .sidebar-item.subsection .sidebar-link {
+  font-size: 12px;
+  padding: 5px 15px 5px 20px;
+  margin: 0 5px;
+}
+
+/* Main Content Link Icons */
+.main-content .sidebar-item.subsection .sidebar-link .link-icon {
+  color: rgba(255, 255, 255, 0.6);
+  margin-right: 6px;
+}
+
+/* Active state for main content link icons */
+.main-content .sidebar-item.subsection.active .sidebar-link .link-icon {
+  color: #3b82f6;
+}
+
+/* Hover state for main content link icons */  
+.main-content .sidebar-item.subsection:hover .sidebar-link .link-icon {
+  color: white;
+}
+
+/* Data Source Section */
+.sidebar-section.data-source-section {
+  margin-bottom: 5px;
+  margin-left: 10px;
 }
 
 /* Section Header */
@@ -41,18 +93,64 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 15px 20px;
+  padding: 10px 15px;
   background: rgba(255, 255, 255, 0.12);
-  border-radius: 10px;
+  border-radius: 8px;
   backdrop-filter: blur(10px);
   font-weight: 600;
-  font-size: 14px;
+  font-size: 13px;
   color: white;
-  text-transform: uppercase;
+  /* text-transform: uppercase; */
   cursor: pointer;
   border: none;
-  margin: 0 15px 10px 15px;
+  margin: 0 10px 5px 10px;
   transition: background 0.2s ease;
+}
+
+/* Main Header (AMS ProEn) */
+.section-header.main-header {
+  padding: 12px 15px;
+  font-size: 14px;
+  background: rgba(255, 255, 255, 0.18);
+  margin: 0 10px 10px 10px;
+}
+
+/* Header Content */
+.header-content {
+  display: flex;
+  align-items: center;
+  flex-direction: row;
+  gap: 8px;
+}
+
+/* Section Icons */
+.section-icon {
+  color: rgba(255, 255, 255, 0.9);
+  flex-shrink: 0;
+}
+
+/* Hover state for section icons */
+.section-header:hover .section-icon {
+  color: white;
+}
+
+/* Link Icons */
+.link-icon {
+  color: rgba(255, 255, 255, 0.7);
+  flex-shrink: 0;
+  margin-right: 8px;
+  display: flex;
+  align-items: center;
+}
+
+/* Active state for link icons */
+.sidebar-item.active .sidebar-link .link-icon {
+  color: #3b82f6;
+}
+
+/* Hover state for link icons */
+.sidebar-link:hover .link-icon {
+  color: white;
 }
 .section-header:hover {
   background: rgba(255, 255, 255, 0.18);
@@ -84,15 +182,15 @@
   width: 100%;
   text-decoration: none;
   color: rgba(255, 255, 255, 0.9);
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 500;
-  padding: 12px 20px;
-  border-radius: 8px;
+  padding: 8px 15px;
+  border-radius: 6px;
   background: transparent;
   transition: all 0.2s ease;
   outline: none;
   border: none;
-  margin: 0 15px;
+  margin: 0 10px;
 }
 
 /* Hover State */
@@ -120,13 +218,13 @@
 
 /* Subsection Items */
 .sidebar-item.subsection .sidebar-link {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   color: rgba(255, 255, 255, 0.8);
   background: transparent;
-  margin: 0 15px;
-  border-radius: 6px;
-  padding: 10px 25px;
+  margin: 0 10px;
+  border-radius: 5px;
+  padding: 6px 20px 6px 25px;
 }
 .sidebar-item.subsection.active .sidebar-link {
   background: white;

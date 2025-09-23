@@ -192,7 +192,7 @@ const ReportViewer = ({ rawData, headerIndices }) => {
 
   return (
     <div className="combined-report-container">
-      {/* <div className="view-switcher">
+      <div className="view-switcher">
         <button
           className={`view-button ${activeView === 'table' ? 'active' : ''}`}
           onClick={() => setActiveView('table')}
@@ -205,7 +205,7 @@ const ReportViewer = ({ rawData, headerIndices }) => {
         >
           Analytics View
         </button>
-      </div> */}
+      </div>
 
       {activeView === 'table' ? (
         <TableReport 

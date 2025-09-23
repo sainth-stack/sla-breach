@@ -28,8 +28,9 @@ const Navbar = () => {
         <div className="navbar-left">
           <img src={lg1Logo} alt="Logo 1" className="navbar-logo-left" />
         </div>
-      
-        
+        <div className="navbar-center">
+          <span className="navbar-title">AMS ProEn</span>
+        </div>
         <div className="navbar-right">
           <img src={lg2Logo} alt="Logo 2" className="navbar-logo-right" />
         </div>

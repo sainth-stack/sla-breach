@@ -61,12 +61,29 @@ export const MainPages = () => {
       try {
         // First check if we have an uploaded file info to get the filename
         const uploadedFileInfo = localStorage.getItem('uploadedFile');
+        
+        if (!uploadedFileInfo) {
+          setError('No data file found. Please upload a data file to begin analysis.');
+          setIsLoading(false);
+          return;
+        }
+
         let filename = 'data1.csv'; // Default filename
         
-        if (uploadedFileInfo) {
+        try {
           const fileInfo = JSON.parse(uploadedFileInfo);
+          if (!fileInfo.name) {
+            setError('No data file found. Please upload a data file to begin analysis.');
+            setIsLoading(false);
+            return;
+          }
           // Use serverFilename if available, otherwise fallback to default
           filename = fileInfo.serverFilename || 'data1.csv';
+        } catch (parseError) {
+          console.error('Error parsing uploaded file info:', parseError);
+          setError('Invalid file information. Please upload a data file again.');
+          setIsLoading(false);
+          return;
         }
 
         // Use the reusable function to load data
