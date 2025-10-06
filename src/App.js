@@ -7,6 +7,7 @@ import DataSource from "./pages/data-source";
 import {AdminLayout} from './layout'
 import { MainPages } from "./pages/data";
 import ComingSoon from "./pages/ComingSoon";
+import BIReport from "./pages/bi-report";
 
 function App() {
   return (
@@ -52,6 +53,9 @@ function App() {
             {/* Effectiveness of Measures Section */}
             <Route path="/effectiveness-occurrence" element={<ComingSoon />} />
             <Route path="/effectiveness-resolution-time" element={<ComingSoon />} />
+
+            {/* BI Report */}
+            <Route path="/bi-report" element={<BIReport />} />
 
             {/* 404 fallback */}
             <Route path="*" element={<ComingSoon />} />

@@ -395,6 +395,16 @@ export default function Sidebar() {
                     </ul>
                   )}
                 </li>
+                <li className="sidebar-section">
+                  <div className="section-header">
+                    <Link to="/bi-report" className="sidebar-link">
+                      <div className="header-content">
+                      <MdBarChart size={16} className="section-icon" />
+                      <span className="section-title">BI Report</span>
+                    </div>
+                    </Link>
+                  </div>
+                </li>
               </div>
             )}
           </li>
