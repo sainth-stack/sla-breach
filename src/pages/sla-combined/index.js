@@ -1,32 +1,47 @@
-import React from 'react';
+import React, { useState } from 'react';
 import TktsSLAsTable from '../bi-report/TktsSLAsTable';
 import TktsSLAsChart from '../bi-report/TktsSLAsChart';
 import './index.css';
 
 const SLACombined = () => {
+  const [activeTab, setActiveTab] = useState('Tkts_SLAs_Table');
+
+  const tabs = [
+    { id: 'Tkts_SLAs_Table', label: 'Tkts_SLAs_Table' },
+    { id: 'Tkts_SLAs_Chart', label: 'Tkts_SLAs_Chart' }
+  ];
+
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case 'Tkts_SLAs_Table':
+        return <TktsSLAsTable />;
+      case 'Tkts_SLAs_Chart':
+        return <TktsSLAsChart />;
+      default:
+        return <TktsSLAsTable />;
+    }
+  };
+
   return (
     <div className="sla-combined-container">
       <div className="sla-combined-header">
         <h1>Resolution and Response Time SLA</h1>
-        <p>View both tickets SLA table and chart for comprehensive analysis</p>
       </div>
       
-      <div className="sla-section">
-        <div className="section-header">
-          <h2>Tickets SLA Table</h2>
-        </div>
-        <div className="table-container">
-          <TktsSLAsTable />
-        </div>
+      <div className="view-switcher">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            className={`view-button ${activeTab === tab.id ? 'active' : ''}`}
+            onClick={() => setActiveTab(tab.id)}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
-      
-      <div className="sla-section">
-        <div className="section-header">
-          <h2>Tickets SLA Chart</h2>
-        </div>
-        <div className="chart-container">
-          <TktsSLAsChart />
-        </div>
+
+      <div className="sla-combined-content">
+        {renderTabContent()}
       </div>
     </div>
   );

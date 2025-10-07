@@ -1,7 +1,9 @@
 .sla-combined-container {
+  display: flex;
+  flex-direction: column;
+  background-color: #f5f5f5;
   padding: 20px;
-  max-width: 100%;
-  margin: 0 auto;
+  align-items: center;
 }
 
 .sla-combined-header {
@@ -10,52 +12,52 @@
 }
 
 .sla-combined-header h1 {
-  color: #2c3e50;
-  font-size: 2.2rem;
+  color: #333;
+  font-size: 24px;
   font-weight: 600;
-  margin-bottom: 10px;
+  margin: 0;
 }
 
-.sla-combined-header p {
-  color: #7f8c8d;
-  font-size: 1.1rem;
-  margin-bottom: 0;
+.view-switcher {
+  display: inline-flex;
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 4px;
+  margin: 0 auto 20px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
-.sla-section {
-  margin-bottom: 40px;
-  border: 1px solid #e0e0e0;
-  border-radius: 12px;
-  background: #ffffff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+.sla-combined-content {
+  flex: 1;
+  width: 100%;
+  background-color: white;
+  border-radius: 8px;
   overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-.sla-section .section-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  padding: 15px 20px;
-  margin: 0;
-}
-
-.sla-section .section-header h2 {
-  margin: 0;
-  font-size: 1.4rem;
+.view-button {
+  position: relative;
+  padding: 8px 16px;
+  font-size: 14px;
   font-weight: 500;
+  color: #64748b;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-radius: 6px;
+  z-index: 1;
 }
 
-.table-container,
-.chart-container {
-  padding: 20px;
+.view-button:hover {
+  color: #334155;
 }
 
-.table-container {
-  background: #fafafa;
-}
-
-.chart-container {
-  background: #ffffff;
-  min-height: 400px;
+.view-button.active {
+  color: #2563eb;
+  background: white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 /* Responsive design */
@@ -65,11 +67,19 @@
   }
   
   .sla-combined-header h1 {
-    font-size: 1.8rem;
+    font-size: 20px;
+    text-align: center;
   }
   
-  .table-container,
-  .chart-container {
-    padding: 15px;
+  .view-switcher {
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  
+  .view-button {
+    padding: 8px 20px;
+    font-size: 13px;
+    min-width: 120px;
   }
 }
