@@ -163,7 +163,7 @@ const ConsultantWise = () => {
               border: '1px solid #ffcdd2'
             }}>
               <div style={{ fontSize: '24px', fontWeight: '700', color: '#c62828' }}>
-                {summary.total_p1_tickets}
+                {summary.monthly_p1_tickets || 0}
               </div>
               <div style={{ fontSize: '12px', color: '#666', fontWeight: '500' }}>
                 P1 Critical Tickets
@@ -453,10 +453,10 @@ const ConsultantWise = () => {
                 </div>
                 {summary && (
                   <div style={{ color: '#495057', display: 'flex', gap: '20px' }}>
-                    <span>P1: <strong style={{ color: '#dc2626' }}>{summary.total_p1_tickets}</strong></span>
-                    <span>P2: <strong style={{ color: '#d97706' }}>{summary.total_p2_tickets}</strong></span>
-                    <span>P3: <strong style={{ color: '#2563eb' }}>{summary.total_p3_tickets}</strong></span>
-                    <span>P4: <strong style={{ color: '#059669' }}>{summary.total_p4_tickets}</strong></span>
+                    <span>P1: <strong style={{ color: '#dc2626' }}>{summary.monthly_p1_tickets || 0}</strong></span>
+                    <span>P2: <strong style={{ color: '#d97706' }}>{summary.monthly_p2_tickets || 0}</strong></span>
+                    <span>P3: <strong style={{ color: '#2563eb' }}>{summary.monthly_p3_tickets || 0}</strong></span>
+                    <span>P4: <strong style={{ color: '#059669' }}>{summary.monthly_p4_tickets || 0}</strong></span>
                     <span>Total: <strong>{summary.total_tickets}</strong></span>
                   </div>
                 )}
