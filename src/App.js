@@ -8,6 +8,8 @@ import {AdminLayout} from './layout'
 import { MainPages } from "./pages/data";
 import ComingSoon from "./pages/ComingSoon";
 import BIReport from "./pages/bi-report";
+import SLACombined from "./pages/sla-combined";
+import ResourceEffectivenessConsultant from "./pages/resource-effectiveness-consultant";
 
 function App() {
   return (
@@ -22,8 +24,7 @@ function App() {
             <Route path="/kedb" element={<KEDB />} />
 
             {/* SLA Section */}
-            <Route path="/sla-resolution-time" element={<ComingSoon />} />
-            <Route path="/sla-response-time" element={<ComingSoon />} />
+            <Route path="/sla-resolution-response-time" element={<SLACombined />} />
 
             {/* Incident Management Section */}
             <Route path="/incidents-percent" element={<ComingSoon />} />
@@ -36,7 +37,7 @@ function App() {
 
             {/* Resource Effectiveness Section */}
             <Route path="/resource-queue-length" element={<ComingSoon />} />
-            <Route path="/resource-incidents-resolved" element={<ComingSoon />} />
+            <Route path="/resource-incidents-resolved" element={<ResourceEffectivenessConsultant />} />
             <Route path="/resource-time-per-resolution" element={<ComingSoon />} />
 
             {/* Trouble Shooting Assistance Section */}

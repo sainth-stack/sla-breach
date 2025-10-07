@@ -43,7 +43,7 @@ const TktsSLAsChart = () => {
           flexDirection: 'column',
           justifyContent: 'center',
           alignItems: 'center',
-          height: '400px',
+          height: '700px',
           backgroundColor: '#f8f9fa',
           borderRadius: '12px',
           border: '2px dashed #dee2e6',
@@ -126,10 +126,22 @@ const TktsSLAsChart = () => {
         type: 'scatter',
         mode: 'lines+markers+text',
         line: { color: '#E67E22', width: 3 },  // Orange matching the image
-        marker: { size: 8, color: '#E67E22' },
+        marker: { 
+          size: 14, 
+          color: '#FFFFFF',  // White center for visibility on blue background
+          line: { color: '#E67E22', width: 3 },  // Thick orange border for visibility on white background
+          symbol: 'circle'
+        },
         text: chartData.responseSLA.map(val => Math.round(val).toString()),
         textposition: 'top center',
-        textfont: { size: 10, color: '#E67E22' },
+        textfont: { 
+          size: 12, 
+          color: '#000000',  // Black text for maximum visibility
+          family: 'Arial, sans-serif',
+          weight: 'bold'
+        },
+        texttemplate: '%{text}',
+        cliponaxis: false,
         yaxis: 'y2',
       },
       {
@@ -139,10 +151,22 @@ const TktsSLAsChart = () => {
         type: 'scatter',
         mode: 'lines+markers+text',
         line: { color: '#8E44AD', width: 3 },  // Purple matching the image
-        marker: { size: 8, color: '#8E44AD' },
+        marker: { 
+          size: 14, 
+          color: '#FFFFFF',  // White center for visibility on blue background
+          line: { color: '#8E44AD', width: 3 },  // Thick violet border for visibility on white background
+          symbol: 'circle'
+        },
         text: chartData.resolutionSLA.map(val => Math.round(val).toString()),
         textposition: 'top center',
-        textfont: { size: 10, color: '#8E44AD' },
+        textfont: { 
+          size: 12, 
+          color: '#000000',  // Black text for maximum visibility
+          family: 'Arial, sans-serif',
+          weight: 'bold'
+        },
+        texttemplate: '%{text}',
+        cliponaxis: false,
         yaxis: 'y2',
       }
     ];
@@ -185,7 +209,7 @@ const TktsSLAsChart = () => {
         overlaying: 'y',
         color: '#8E44AD',
         tickfont: { color: '#8E44AD' },
-        range: [0, 100],
+        range: [0, 110],
         dtick: 20
       },
       legend: {
@@ -196,19 +220,21 @@ const TktsSLAsChart = () => {
         borderwidth: 1,
         font: { size: 11 }
       },
-      margin: { l: 80, r: 80, t: 60, b: 120 },
+      margin: { l: 80, r: 80, t: 100, b: 120 },
+      constraintext: 'none',
       plot_bgcolor: 'rgba(248,249,250,0.5)',
       paper_bgcolor: 'white',
       bargap: 0.3,
       bargroupgap: 0.1,
       autosize: true,
-      font: { family: 'Inter, Arial, sans-serif', size: 12 }
+      font: { family: 'Inter, Arial, sans-serif', size: 12 },
+      showlegend: true
     };
 
     return (
       <div style={{
         width: '100%',
-        minHeight: '500px',
+        minHeight: '700px',
         position: 'relative',
         backgroundColor: 'white',
         borderRadius: '12px',
@@ -245,7 +271,7 @@ const TktsSLAsChart = () => {
         </div>
 
         {/* Plotly Chart */}
-        <div style={{ flex: 1, minHeight: '400px' }}>
+        <div style={{ flex: 1, minHeight: '600px' }}>
           <Plot
             data={traces}
             layout={layout}
@@ -257,7 +283,7 @@ const TktsSLAsChart = () => {
               toImageButtonOptions: {
                 format: 'png',
                 filename: 'ticket_statistics_chart',
-                height: 500,
+                height: 600,
                 width: 800,
                 scale: 1
               },
@@ -266,7 +292,7 @@ const TktsSLAsChart = () => {
             style={{ 
               width: '100%', 
               height: '100%',
-              minHeight: '400px'
+              minHeight: '600px'
             }}
             useResizeHandler={true}
           />
@@ -354,7 +380,7 @@ const TktsSLAsChart = () => {
     <div className="table-report-container" style={{ paddingBottom: '40px' }}>
       {/* Chart Header */}
       <div className="report-card" style={{ overflow: 'visible', marginBottom: '20px' }}>
-        <div className="report-header" style={{ padding: '20px 24px' }}>
+        {/* <div className="report-header" style={{ padding: '20px 24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '8px' }}>
             <div style={{ 
               width: '4px', 
@@ -374,25 +400,21 @@ const TktsSLAsChart = () => {
           }}>
             Visual representation of ticket trends and SLA performance over time
           </p>
-        </div>
+        </div> */}
       </div>
 
       {/* Chart Section */}
       <div style={{ 
-        margin: '0 24px',
         backgroundColor: 'white',
-        borderRadius: '12px',
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
-        border: '1px solid #e9ecef',
         overflow: 'visible',
-        minHeight: '600px',
+        minHeight: '800px',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center'
       }}>
         <div style={{ 
-          padding: '24px',
-          minHeight: '500px',
+          // padding: '24px',
+          minHeight: '750px',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'center'

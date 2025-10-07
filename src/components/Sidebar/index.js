@@ -111,16 +111,10 @@ export default function Sidebar() {
                   </div>
                   {expandedSections.sla && (
                     <ul className="subsection-list">
-                      <li className={`sidebar-item subsection ${location.pathname === "/sla-resolution-time" ? "active" : ""}`}>
-                        <Link to="/sla-resolution-time" className="sidebar-link">
+                      <li className={`sidebar-item subsection ${location.pathname === "/sla-resolution-response-time" ? "active" : ""}`}>
+                        <Link to="/sla-resolution-response-time" className="sidebar-link">
                           <MdTimer size={14} className="link-icon" />
-                          <span className="link-text">Resolution Time and trend</span>
-                        </Link>
-                      </li>
-                      <li className={`sidebar-item subsection ${location.pathname === "/sla-response-time" ? "active" : ""}`}>
-                        <Link to="/sla-response-time" className="sidebar-link">
-                          <MdSpeed size={14} className="link-icon" />
-                          <span className="link-text">Response Time and Trend</span>
+                          <span className="link-text">Resolution and Response Time</span>
                         </Link>
                       </li>
                       <li className={`sidebar-item subsection ${location.pathname === "/self-monitoring" ? "active" : ""}`}>
@@ -395,7 +389,7 @@ export default function Sidebar() {
                     </ul>
                   )}
                 </li>
-                <li className="sidebar-section">
+                {/* <li className="sidebar-section">
                   <div className="section-header">
                     <Link to="/bi-report" className="sidebar-link">
                       <div className="header-content">
@@ -404,7 +398,7 @@ export default function Sidebar() {
                     </div>
                     </Link>
                   </div>
-                </li>
+                </li> */}
               </div>
             )}
           </li>
