@@ -4,7 +4,7 @@ import TktsSLAsChart from '../bi-report/TktsSLAsChart';
 import './index.css';
 
 const SLACombined = () => {
-  const [activeTab, setActiveTab] = useState('Tkts_SLAs_Table');
+  const [activeTab, setActiveTab] = useState('Tkts_SLAs_Chart');
 
   const tabs = [
     { id: 'Tkts_SLAs_Table', label: 'Tkts_SLAs_Table' },
@@ -28,7 +28,7 @@ const SLACombined = () => {
         <h1>Resolution and Response Time SLA</h1>
       </div>
       
-      <div className="view-switcher">
+      {/* <div className="view-switcher">
         {tabs.map((tab) => (
           <button
             key={tab.id}
@@ -38,7 +38,7 @@ const SLACombined = () => {
             {tab.label}
           </button>
         ))}
-      </div>
+      </div> */}
 
       <div className="sla-combined-content">
         {renderTabContent()}

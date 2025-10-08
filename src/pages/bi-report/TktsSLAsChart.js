@@ -245,30 +245,6 @@ const TktsSLAsChart = () => {
         flexDirection: 'column'
       }}>
         {/* Chart Header */}
-        <div style={{
-          textAlign: 'center',
-          marginBottom: '20px',
-          padding: '10px',
-          backgroundColor: '#f8f9fa',
-          borderRadius: '8px',
-          border: '1px solid #e9ecef'
-        }}>
-          <h4 style={{ 
-            margin: '0 0 8px 0', 
-            color: '#495057', 
-            fontSize: '18px', 
-            fontWeight: '700' 
-          }}>
-            Interactive Chart View
-          </h4>
-          <p style={{ 
-            margin: 0, 
-            color: '#6c757d', 
-            fontSize: '12px' 
-          }}>
-            Hover over data points for detailed information • Use toolbar for zoom and pan
-          </p>
-        </div>
 
         {/* Plotly Chart */}
         <div style={{ flex: 1, minHeight: '600px' }}>
