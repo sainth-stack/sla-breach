@@ -87,9 +87,10 @@ const KEDB = () => {
       initialMessage="Hello! I'm your Knowledge Base assistant. Ask me about any errors, incidents, or issues you need help with. I can search through historical data to find similar cases and solutions."
       showFileInfo={false}
       showRecentChats={true}
-      showSessionInfo={true}
+      showSessionInfo={false}
       className="kedb-chatbot"
       maxWidth="1400px"
+      isKnowledgeBase={true}
     />
   );
 };

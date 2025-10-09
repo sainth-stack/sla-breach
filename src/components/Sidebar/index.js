@@ -272,7 +272,7 @@ export default function Sidebar() {
                       <li className={`sidebar-item subsection ${location.pathname === "/kedb" ? "active" : ""}`}>
                         <Link to="/kedb" className="sidebar-link">
                           <MdLightbulb size={14} className="link-icon" />
-                          <span className="link-text">Suggested Actions- KEDB</span>
+                          <span className="link-text">Suggested Actions - Knowledge Bank</span>
                         </Link>
                       </li>
                       <li className={`sidebar-item subsection ${location.pathname === "/web-suggested-actions" ? "active" : ""}`}>

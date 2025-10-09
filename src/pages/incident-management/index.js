@@ -40,8 +40,37 @@ const IncidentManagement = () => {
         return;
       }
 
-      // If file exists, fetch incident data
+      // If file exists, fetch incident data (with caching)
       try {
+        // Build cache key using endpoint and file identity
+        const cacheKey = 'incident_data_cache_v1';
+        const cacheTTLms = 5 * 60 * 1000; // 5 minutes TTL
+        const now = Date.now();
+
+        // Attempt cache read
+        try {
+          const cachedRaw = localStorage.getItem(cacheKey);
+          if (cachedRaw) {
+            const cached = JSON.parse(cachedRaw);
+            if (cached && cached.timestamp && (now - cached.timestamp) < cacheTTLms && cached.data) {
+              setData(cached.data);
+              // set filtered
+              if (Array.isArray(cached.data)) {
+                setFilteredData(cached.data);
+              } else if (cached.data?.records && Array.isArray(cached.data.records)) {
+                setFilteredData(cached.data.records);
+              } else if (typeof cached.data === 'object') {
+                setFilteredData([cached.data]);
+              }
+              setLoading(false);
+              return; // serve from cache
+            }
+          }
+        } catch (e) {
+          console.warn('Incident cache read failed:', e);
+        }
+
+        // No valid cache; fetch fresh
         const response = await fetch(`${baseURL}/predict_incident/`, {
           method: 'GET',
           headers: {
@@ -72,6 +101,17 @@ const IncidentManagement = () => {
           setFilteredData(processedData.records);
         } else if (typeof processedData === 'object') {
           setFilteredData([processedData]);
+        }
+
+        // Write to cache (best-effort)
+        try {
+          const cachePayload = {
+            timestamp: now,
+            data: processedData
+          };
+          localStorage.setItem(cacheKey, JSON.stringify(cachePayload));
+        } catch (e) {
+          console.warn('Incident cache write failed:', e);
         }
       } catch (err) {
         setError(`Failed to load incident data: ${err.message}`);
@@ -251,9 +291,9 @@ const IncidentManagement = () => {
         <FloatingChatBot
           title="Incident Analysis Bot"
           subtitle="Ask questions about incident data"
-          placeholder="Ask about incidents, SLA breaches, etc..."
-          endpoint="/predict/"
-          initialMessage="Hello! I can help you analyze incident data and SLA metrics. You can also upload CSV/Excel files for prediction analysis. What would you like to know?"
+          placeholder="Type a sentence to classify (z_review)"
+          endpoint="/classification/"
+          initialMessage="Hello! Send me a sentence and I'll classify it and show the z_review."
           showFileInfo={true}
           showSessionInfo={true}
           supportFileUpload={true}

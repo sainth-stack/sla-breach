@@ -401,5 +401,5 @@
 
 
 .bot-message {
-  max-width: 100% !important;
+  max-width: 75% !important; /* keep same bubble width as others to avoid tall fill */
 }

@@ -72,32 +72,40 @@ const FloatingChatBot = ({
     const userMessage = message;
     setMessage('');
 
+    // Prepare payloads depending on endpoint type
     const formData = new FormData();
     if(endpoint === "/predict/" || endpoint === "/predict") {
       formData.append('description', userMessage);
-    } else {
+    } else if (endpoint !== "/classification/" && endpoint !== "/classification") {
+      // For normal chat endpoints
       formData.append('query', userMessage);
-    }
-    
-    // Include session_id if we have one
-    if (sessionId) {
-      formData.append('session_id', sessionId);
+      if (sessionId) {
+        formData.append('session_id', sessionId);
+      }
     }
 
     try {
-      const apiEndpoint = (endpoint === "/predict/" ? testUrl : baseURL) + endpoint;
-      
-      // Attach dataset if provided
-      if (dataset && Array.isArray(dataset) && dataset.length > 0) {
-        try {
-          formData.append('dataset', JSON.stringify(dataset));
-        } catch (e) {
-          console.warn('Failed to stringify dataset for chat request:', e);
+      let data;
+      if (endpoint === "/classification/" || endpoint === "/classification") {
+        // External classifier API: return only z_review
+        const classifierUrl = 'https://ams-classifier.cfapps.us10-001.hana.ondemand.com/v1/classification/sentence';
+        const response = await axios.post(classifierUrl, { sentence: userMessage }, {
+          headers: { 'Content-Type': 'application/json' }
+        });
+        data = response.data;
+      } else {
+        const apiEndpoint = (endpoint === "/predict/" ? testUrl : baseURL) + endpoint;
+        // Attach dataset if provided
+        if (dataset && Array.isArray(dataset) && dataset.length > 0) {
+          try {
+            formData.append('dataset', JSON.stringify(dataset));
+          } catch (e) {
+            console.warn('Failed to stringify dataset for chat request:', e);
+          }
         }
+        const response = await axios.post(apiEndpoint, formData);
+        data = response.data;
       }
-
-      const response = await axios.post(apiEndpoint, formData);
-      const data = response.data;
       console.log('Backend response:', data);
     
       // Update session_id if we received one
@@ -108,8 +116,25 @@ const FloatingChatBot = ({
       // Remove loading message and add actual response
       let responseMessage;
       
-      // Special handling for /predict endpoint
-      if (endpoint === "/predict/" || endpoint === "/predict") {
+      // Special handling for /classification and /predict endpoints
+      if (endpoint === "/classification/" || endpoint === "/classification") {
+        // Column order: department, area, brand, location, site, review
+        const tableRow = {
+          department: data?.department ?? '',
+          area: data?.subfunctional_area ?? '',
+          brand: data?.brand ?? '',
+          location: data?.location ?? '',
+          site: data?.site ?? '',
+          review: data?.z_review ?? ''
+        };
+        responseMessage = {
+          type: 'bot',
+          responseType: 'table',
+          content: 'Classification Result',
+          explanation: 'Mapped fields from classifier response',
+          tableData: [tableRow]
+        };
+      } else if (endpoint === "/predict/" || endpoint === "/predict") {
         // Check if data is a direct object (the case we're handling)
         if (data && typeof data === 'object' && !data.type && !data.payload) {
           // Convert the object to horizontal table format (single row with keys as columns)

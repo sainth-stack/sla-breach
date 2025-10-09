@@ -15,7 +15,8 @@ const ChatBot = ({
   showRecentChats = true,
   showSessionInfo = true,
   className = "",
-  maxWidth = "1200px"
+  maxWidth = "1200px",
+  isKnowledgeBase = false
 }) => {
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -58,49 +59,93 @@ const ChatBot = ({
     }]);
     
     setIsLoading(true);
-    const formData = new FormData();
-    formData.append('query', message);
-    
-    // Include session_id if we have one
-    if (sessionId) {
-      formData.append('session_id', sessionId);
-    }
+    const userMessage = message;
 
     try {
-      const apiEndpoint = baseURL + endpoint;
-      
-      const response = await fetch(apiEndpoint, {
-        method: 'POST',
-        body: formData,
-      });
+      let apiEndpoint, requestBody, headers, response, data;
+
+      if (isKnowledgeBase) {
+        // Knowledge Base API configuration
+        apiEndpoint = 'https://ams-vectorizer.cfapps.us10-001.hana.ondemand.com/similar-tickets/query';
+        requestBody = JSON.stringify({
+          query: userMessage
+        });
+        headers = {
+          'Content-Type': 'application/json'
+        };
+        
+        response = await fetch(apiEndpoint, {
+          method: 'POST',
+          headers: headers,
+          body: requestBody,
+        });
+      } else {
+        // Original API configuration
+        const formData = new FormData();
+        formData.append('query', userMessage);
+        
+        // Include session_id if we have one
+        if (sessionId) {
+          formData.append('session_id', sessionId);
+        }
+
+        apiEndpoint = baseURL + endpoint;
+        
+        response = await fetch(apiEndpoint, {
+          method: 'POST',
+          body: formData,
+        });
+      }
     
       if (!response.ok) {
         throw new Error(`HTTP error! Status: ${response.status}`);
       }
     
-      const data = await response.json();
+      data = await response.json();
       console.log('Backend response:', data);
-    
-      // Update session_id if we received one
-      if (data?.session_id && showSessionInfo) {
-        setSessionId(data.session_id);
-      }
-    
-      // Remove loading message and add actual response
-      setMessages(prev => prev.filter(msg => !msg.isLoading).concat([{ 
-        type: 'bot', 
-        responseType: data?.type || 'text',
-        content: data?.payload,
-        explanation: data?.explanation,
-        plotlyData: data?.type === 'plotly' ? data?.payload : null,
-        tableData: data?.type === 'table' ? data?.payload : null
-      }]));
-    
-      if (showRecentChats) {
-        setRecentChats(prev => [...prev, { 
-          question: message, 
-          answer: data?.explanation || 'Processed successfully' 
-        }]);
+
+      if (isKnowledgeBase) {
+        // Handle Knowledge Base API response format (preserve existing styling)
+        const plainResponse = typeof data?.response === 'string' ? data.response : '';
+        const formattedResponse = plainResponse
+          ? plainResponse.replace(/\n/g, '<br/>')
+          : 'No response returned.';
+
+        setMessages(prev => prev.filter(msg => !msg.isLoading).concat([{ 
+          type: 'bot', 
+          responseType: 'text',
+          content: formattedResponse
+        }]));
+
+        if (showRecentChats) {
+          setRecentChats(prev => [...prev, { 
+            question: userMessage, 
+            answer: 'Knowledge Base search completed' 
+          }]);
+        }
+      } else {
+        // Handle original API response format
+        // Update session_id if we received one
+        if (data?.session_id && showSessionInfo) {
+          setSessionId(data.session_id);
+        }
+      
+        // Remove loading message and add actual response
+        setMessages(prev => prev.filter(msg => !msg.isLoading).concat([{ 
+          type: 'bot', 
+          responseType: data?.type || 'text',
+          content: data?.payload,
+          explanation: data?.explanation,
+          plotlyData: data?.type === 'plotly' ? data?.payload : null,
+          tableData: data?.type === 'table' ? data?.payload : null
+        }]));
+      
+        if (showRecentChats) {
+          setRecentChats(prev => [...prev, { 
+            question: userMessage, 
+            answer: data?.explanation || 'Processed successfully' 
+          }]);
+        }
       }
     } catch (error) {
       console.error('Error:', error);
@@ -191,7 +236,7 @@ const ChatBot = ({
               key={index}
               className={`message-container ${msg.question ? 'user-message-container' : 'bot-message-container'}`}
             >
-              <div className={`message ${msg.type === 'user' ? 'user-message' : 'bot-message'}`}>
+              <div className={`message ${msg.type === 'user' ? 'user-message' : 'bot-message'} ${msg.isLoading ? 'loading-message' : ''}`}>
                 {msg.isLoading ? (
                   <div className="loading-container">
                     <CircularProgress size={20} className="loading-spinner" />

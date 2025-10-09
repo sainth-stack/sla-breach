@@ -225,6 +225,7 @@
   color: #1a202c;
   border: 1px solid #e2e8f0;
   border-bottom-left-radius: 4px;
+  text-align: left;
 }
 
 .message-timestamp {
@@ -235,11 +236,12 @@
 }
 
 .loading-container {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   color: #64748b;
   font-size: 14px;
+  min-height: 20px;
 }
 
 .loading-spinner {
@@ -249,6 +251,18 @@
 /* Response Type Styles */
 .text-response {
   line-height: 1.6;
+  text-align: left;
+}
+
+/* Keep loading message compact */
+.loading-message {
+  display: inline-flex;
+  padding: 8px 12px;
+  height: auto;
+  max-height: 48px;
+  width: auto;
+  align-items: center;
+  overflow: hidden;
 }
 
 .text-response h1, .text-response h2, .text-response h3 {

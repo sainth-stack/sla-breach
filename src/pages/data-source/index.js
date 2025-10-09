@@ -4,7 +4,7 @@ import { FaUpload, FaFileAlt, FaCheckCircle, FaSpinner } from "react-icons/fa";
 import { IoCloudUploadOutline } from "react-icons/io5";
 import { useNavigate } from 'react-router-dom';
 import { baseURL } from '../../const';
-import { readFileAsData, processFileData } from '../../utils/dataProcessor';
+// Removed: readFileAsData, processFileData (no longer needed)
 
 const DataSource = () => {
   const [file, setFile] = useState(null);
@@ -27,50 +27,56 @@ const DataSource = () => {
     setUploadStatus('');
 
     try {
-      // Step 1: Read the file data
-      const rawData = await readFileAsData(selectedFile);
-      console.log('File read successfully:', rawData?.length, 'rows');
+      // Optionally gzip compress large CSV files to reduce upload time
+      const compressIfSupported = async (file) => {
+        try {
+          if (file.name.endsWith('.gz') || (file.type && file.type.includes('gzip'))) {
+            return file;
+          }
+          // Only attempt to compress likely text-based files
+          const isCsvLike = file.name.endsWith('.csv') || (file.type && file.type.includes('csv'));
+          if (!isCsvLike) return file;
 
-      // Step 2: Process the data using our utility
-      const processedData = processFileData(rawData);
-      if (!processedData || processedData.length === 0) {
-        throw new Error('Failed to process file data. Please check the file format.');
-      }
+          // Heuristic: compress if file > 1MB
+          if (file.size < 1 * 1024 * 1024) return file;
 
-      console.log('Data processed successfully:', processedData.length, 'rows');
+          if (typeof CompressionStream === 'function') {
+            const cs = new CompressionStream('gzip');
+            const compressedStream = file.stream().pipeThrough(cs);
+            const compressedBlob = await new Response(compressedStream).blob();
+            const gzName = file.name.endsWith('.csv') ? `${file.name}.gz` : `${file.name}.gz`;
+            return new File([compressedBlob], gzName, { type: 'application/gzip' });
+          }
+        } catch (e) {
+          console.warn('Compression failed or not supported, uploading original file. Error:', e);
+        }
+        return file;
+      };
 
-      // Step 3: Convert processed data to the format expected by the API
-      const [headers, ...rows] = processedData;
-      const records = rows.map(row => {
-        const record = {};
-        headers.forEach((header, index) => {
-          record[header] = row[index] || '';
-        });
-        return record;
-      });
+      const fileToSend = await compressIfSupported(selectedFile);
 
-      // Step 4: Send processed data to API
-      const response = await fetch(baseURL + '/upload_processed_data', {
+      // Build multipart form and send file to backend (already processed file)
+      const formData = new FormData();
+      formData.append('file', fileToSend);
+      formData.append('original_filename', selectedFile.name);
+
+      const response = await fetch(baseURL + '/upload_data', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          filename: selectedFile.name,
-          records: records,
-          headers: headers
-        }),
+        body: formData,
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+        let errorMessage = `HTTP error! status: ${response.status}`;
+        try {
+          const errJson = await response.json();
+          errorMessage = errJson.detail || errorMessage;
+        } catch (_) {}
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
-      console.log('Upload successful:', data);
 
-      // Store file information
+      // Store minimal file information
       const fileInfo = {
         name: selectedFile.name,
         uploadDate: new Date().toISOString(),
@@ -78,30 +84,14 @@ const DataSource = () => {
         originalName: selectedFile.name,
         serverFilename: 'data1.csv',
         processed: true,
-        recordCount: records.length
       };
       localStorage.setItem('uploadedFile', JSON.stringify(fileInfo));
-      
 
       setUploadStatus('success');
       
-      // Navigate to self-monitoring page
-      setTimeout(() => {
-        navigate('/self-monitoring');
-      }, 1500);
-      
     } catch (error) {
-      console.error('Error processing/uploading file:', error);
+      console.error('Error uploading file:', error);
       setUploadStatus('error');
-      
-      // Show more detailed error message
-      if (error.message.includes('Unsupported file format')) {
-        console.error('Please upload a valid CSV or Excel file.');
-      } else if (error.message.includes('Failed to process')) {
-        console.error('The file format appears to be invalid. Please check your data structure.');
-      } else {
-        console.error('Upload failed. Please try again.');
-      }
     } finally {
       setIsLoading(false);
     }
@@ -153,7 +143,7 @@ const DataSource = () => {
               type="file"
               ref={fileInputRef}
               onChange={handleFileChange}
-              accept=".csv,.xlsx,.xls"
+              accept=".csv,.csv.gz,.xlsx,.xls"
               style={{ display: 'none' }}
             />
             

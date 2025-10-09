@@ -1,108 +1,21 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useMemo } from "react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import Report from "./report";
 import { baseURL } from "../../const";
 import { processFileData, HOLIDAYS_BY_YEAR, YELLOW_FIELDS } from "../../utils/dataProcessor";
 import FloatingChatBot from "../../components/ChatBot/FloatingChatBot";
+import { useCsvData, useFileInfo, useHasValidFileInfo } from "../../utils/apiHooks";
 
 // Note: Most utility functions are now imported from dataProcessor.js
 
 export const MainPages = () => {
-  const [csvData, setCsvData] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [holidays, setHolidays] = useState([]);
-  const [error, setError] = useState(null);
+  // Use React Query hooks for caching and API state management
+  const { data: rawCsvData, isLoading, error: queryError, isError } = useCsvData();
+  const fileInfo = useFileInfo();
+  const hasValidFileInfo = useHasValidFileInfo();
 
-  // Function to load data by filename from API
-  const loadDataByFilename = async (filename) => {
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      const response = await fetch(`${baseURL}/get_csv_data/${filename}`);
-      
-      if (!response.ok) {
-        if (response.status === 404) {
-          setError(`File '${filename}' not found. Please check the filename and try again.`);
-        } else {
-          const errorData = await response.json();
-          setError(errorData.detail || 'Error loading data from server.');
-        }
-        setIsLoading(false);
-        return false;
-      }
-
-      const data = await response.json();
-      
-      if (data.records && data.records.length > 0) {
-        // Convert the API response back to array format for processing
-        const headers = Object.keys(data.records[0]);
-        const rows = data.records.map(record => headers.map(header => record[header]));
-        const processedData = [headers, ...rows];
-        processData(processedData);
-        return true;
-      } else {
-        setError('No data found in the file. Please upload a valid file.');
-        setIsLoading(false);
-        return false;
-      }
-    } catch (err) {
-      console.error('Error loading data from API:', err);
-      setError('Error connecting to server. Please try again later.');
-      setIsLoading(false);
-      return false;
-    }
-  };
-
-  // Auto-load data from API on component mount
-  useEffect(() => {
-    const loadInitialData = async () => {
-      try {
-        // First check if we have an uploaded file info to get the filename
-        const uploadedFileInfo = localStorage.getItem('uploadedFile');
-        
-        if (!uploadedFileInfo) {
-          setError('No data file found. Please upload a data file to begin analysis.');
-          setIsLoading(false);
-          return;
-        }
-
-        let filename = 'data1.csv'; // Default filename
-        
-        try {
-          const fileInfo = JSON.parse(uploadedFileInfo);
-          if (!fileInfo.name) {
-            setError('No data file found. Please upload a data file to begin analysis.');
-            setIsLoading(false);
-            return;
-          }
-          // Use serverFilename if available, otherwise fallback to default
-          filename = fileInfo.serverFilename || 'data1.csv';
-        } catch (parseError) {
-          console.error('Error parsing uploaded file info:', parseError);
-          setError('Invalid file information. Please upload a data file again.');
-          setIsLoading(false);
-          return;
-        }
-
-        // Use the reusable function to load data
-        const success = await loadDataByFilename(filename);
-        if (!success) {
-          // Error handling is already done in loadDataByFilename
-          console.log('Failed to load initial data');
-        }
-      } catch (err) {
-        console.error('Error in initial data load:', err);
-        setError('Error loading initial data. Please try again.');
-        setIsLoading(false);
-      }
-    };
-
-    loadInitialData();
-  }, []);
-
-  // Simplified function since heavy lifting is done in the utility
+  // Simplified function since heavy lifting is done in the utility - moved before useMemo
   const getHolidaysForYears = (years) => {
     const uniqueYears = [...new Set(years)];
     const allHolidays = [];
@@ -116,20 +29,18 @@ export const MainPages = () => {
     return allHolidays;
   };
 
-
-  const processData = (data) => {
-    if (!data || data.length === 0) return;
+  // Process the raw CSV data and compute holidays using useMemo for performance
+  const { csvData, holidays } = useMemo(() => {
+    if (!rawCsvData) return { csvData: null, holidays: [] };
     
-    // Use the utility function to process the data
-    const processedData = processFileData(data);
+    // Process the data using the utility function
+    const processedData = processFileData(rawCsvData);
     
     if (!processedData || processedData.length === 0) {
-      setError('Failed to process data. Please check the file format.');
-      setIsLoading(false);
-      return;
+      return { csvData: null, holidays: [] };
     }
     
-    // Extract holidays from the processed data for state management
+    // Extract holidays from the processed data
     const [headers, ...rows] = processedData;
     const years = [];
     const reqCreationDateIndex = headers.indexOf("Req. Creation Date");
@@ -151,11 +62,23 @@ export const MainPages = () => {
     });
     
     const relevantHolidays = getHolidaysForYears(years);
-    setHolidays(relevantHolidays);
+    
+    return { csvData: processedData, holidays: relevantHolidays };
+  }, [rawCsvData]);
 
-    setCsvData(processedData);
-    setIsLoading(false);
-  };
+  // Determine error state and message
+  const error = useMemo(() => {
+    if (!hasValidFileInfo) {
+      return 'No data file found. Please upload a data file to begin analysis.';
+    }
+    if (isError && queryError) {
+      return queryError.message || 'Error loading data from server.';
+    }
+    if (rawCsvData && !csvData) {
+      return 'Failed to process data. Please check the file format.';
+    }
+    return null;
+  }, [hasValidFileInfo, isError, queryError, rawCsvData, csvData]);
 
   // Build dataset for chatbot from processed table (grouped by ticket) - memoized
   const chatDataset = useMemo(() => {
