@@ -65,19 +65,16 @@ const ChatBot = ({
       let apiEndpoint, requestBody, headers, response, data;
 
       if (isKnowledgeBase) {
-        // Knowledge Base API configuration
-        apiEndpoint = 'https://ams-vectorizer.cfapps.us10-001.hana.ondemand.com/similar-tickets/query';
-        requestBody = JSON.stringify({
-          query: userMessage
-        });
-        headers = {
-          'Content-Type': 'application/json'
-        };
-        
+        // Route KB queries to internal vector search API with SAP-style response formatting
+        const formData = new FormData();
+        formData.append('query', userMessage);
+        formData.append('kb_format', 'true');
+
+        apiEndpoint = baseURL + '/vector_search/';
+
         response = await fetch(apiEndpoint, {
           method: 'POST',
-          headers: headers,
-          body: requestBody,
+          body: formData,
         });
       } else {
         // Original API configuration
@@ -105,10 +102,10 @@ const ChatBot = ({
       console.log('Backend response:', data);
 
       if (isKnowledgeBase) {
-        // Handle Knowledge Base API response format (preserve existing styling)
-        const plainResponse = typeof data?.response === 'string' ? data.response : '';
-        const formattedResponse = plainResponse
-          ? plainResponse.replace(/\n/g, '<br/>')
+        // Expect SAP-style response: { request, response, metadata? }
+        const responseText = typeof data?.response === 'string' ? data.response : (typeof data?.payload === 'string' ? data.payload : '');
+        const formattedResponse = responseText
+          ? responseText.replace(/\n/g, '<br/>')
           : 'No response returned.';
 
         setMessages(prev => prev.filter(msg => !msg.isLoading).concat([{ 
