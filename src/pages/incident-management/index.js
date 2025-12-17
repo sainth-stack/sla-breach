@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './index.css';
 import FloatingChatBot from '../../components/ChatBot/FloatingChatBot';
-import { baseURL } from '../../const';
 
 const IncidentManagement = () => {
   const [loading, setLoading] = useState(true);
@@ -71,11 +70,8 @@ const IncidentManagement = () => {
         }
 
         // No valid cache; fetch fresh
-        const response = await fetch(`${baseURL}/predict_incident/`, {
+        const response = await fetch('https://ams-classifier.cfapps.us10-001.hana.ondemand.com/v1/classification/records', {
           method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
         });
 
         if (!response.ok) {
@@ -86,8 +82,13 @@ const IncidentManagement = () => {
         
         // Extract the actual data based on the API response structure
         let processedData;
-        if (result.success && result.data) {
+        if (result.response && Array.isArray(result.response)) {
+          // New API returns data in response array
+          processedData = result.response;
+        } else if (result.success && result.data) {
           processedData = result.data;
+        } else if (Array.isArray(result)) {
+          processedData = result;
         } else {
           processedData = result;
         }
