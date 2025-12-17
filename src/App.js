@@ -32,15 +32,14 @@ function App() {
             <Route path="/incidents-auto-assignment" element={<ComingSoon />} />
 
             {/* Batch Performance Section */}
-            <Route path="/batch-failures" element={<ComingSoon />} />
-            <Route path="/batch-resolution-time" element={<ComingSoon />} />
+            <Route path="/thanksgiving-monitor" element={<ComingSoon />} />
 
             {/* Resource Effectiveness Section */}
             <Route path="/resource-queue-length" element={<ComingSoon />} />
             <Route path="/resource-incidents-resolved" element={<ResourceEffectivenessConsultant />} />
             <Route path="/resource-time-per-resolution" element={<ComingSoon />} />
 
-            {/* Trouble Shooting Assistance Section */}
+            {/* Troubleshooting Assistance Section */}
             <Route path="/web-suggested-actions" element={<ComingSoon />} />
 
             {/* Areas of Improvement Section */}

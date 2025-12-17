@@ -193,16 +193,10 @@ export default function Sidebar() {
                   </div>
                   {expandedSections.batchPerformance && (
                     <ul className="subsection-list">
-                      <li className={`sidebar-item subsection ${location.pathname === "/batch-failures" ? "active" : ""}`}>
-                        <Link to="/batch-failures" className="sidebar-link">
-                          <MdError size={14} className="link-icon" />
-                          <span className="link-text">% of failures</span>
-                        </Link>
-                      </li>
-                      <li className={`sidebar-item subsection ${location.pathname === "/batch-resolution-time" ? "active" : ""}`}>
-                        <Link to="/batch-resolution-time" className="sidebar-link">
-                          <MdSchedule size={14} className="link-icon" />
-                          <span className="link-text">Resolution time and trend</span>
+                      <li className={`sidebar-item subsection ${location.pathname === "/thanksgiving-monitor" ? "active" : ""}`}>
+                        <Link to="/thanksgiving-monitor" className="sidebar-link">
+                          <MdEventNote size={14} className="link-icon" />
+                          <span className="link-text">Thanksgiving Monitor</span>
                         </Link>
                       </li>
                     </ul>
@@ -250,7 +244,7 @@ export default function Sidebar() {
                   )}
                 </li>
 
-                {/* Trouble Shooting Assistance Section */}
+                {/* Troubleshooting Assistance Section */}
                 <li className="sidebar-section">
                   <div 
                     className="section-header" 
@@ -260,7 +254,7 @@ export default function Sidebar() {
                   >
                     <div className="header-content">
                       <MdBuild size={16} className="section-icon" />
-                      <span className="section-title">Trouble Shooting Assist...</span>
+                      <span className="section-title">Troubleshooting Assist...</span>
                     </div>
                     {expandedSections.troubleshooting ? 
                       <RiArrowDownSLine size={14} className="chevron-icon" /> : 
