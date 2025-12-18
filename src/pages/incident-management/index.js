@@ -163,12 +163,18 @@ const IncidentManagement = () => {
     const primaryHeaders = [
       { display: 'SNo', key: 'sno', isGenerated: true },
       { display: 'Ticket Id', key: 'd_ticket_id' },
+      { display: 'Brand', key: 'brand' },
       { display: 'Department', key: 'department' },
       { display: 'Location', key: 'location' },
       { display: 'Site', key: 'site' },
-      { display: 'Name', key: 'brand' },
       { display: 'Sub Functional Area', key: 'subfunctional_area' }
     ];
+
+    // Column display name mapping
+    const columnDisplayMap = {
+      'Text': 'summary',
+      'z_review': 'review'
+    };
 
     // Get all keys from the first record
     const allKeys = Object.keys(filteredData[0]);
@@ -179,10 +185,13 @@ const IncidentManagement = () => {
     // Get remaining keys (not in primary headers, excluding count)
     const remainingKeys = allKeys.filter(key => !primaryKeys.includes(key) && key !== 'count');
     
-    // Create final headers array
+    // Create final headers array with display name mapping
     const headers = [
       ...primaryHeaders,
-      ...remainingKeys.map(key => ({ display: key, key: key }))
+      ...remainingKeys.map(key => ({ 
+        display: columnDisplayMap[key] || key, 
+        key: key 
+      }))
     ];
 
     const firstColumnKey = 'Ticket Id'; // For search label

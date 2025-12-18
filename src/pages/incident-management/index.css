@@ -453,7 +453,7 @@ body {
   white-space: nowrap;
   vertical-align: middle;
   box-sizing: border-box;
-  max-width: 200px;
+  max-width: 150px;
 }
 
 .data-table td {
@@ -466,7 +466,7 @@ body {
   vertical-align: middle;
   text-align: left;
   box-sizing: border-box;
-  max-width: 200px;
+  max-width: 150px;
 }
 
 .data-table th,
