@@ -454,6 +454,7 @@ body {
   vertical-align: middle;
   box-sizing: border-box;
   max-width: 150px;
+  text-transform: none;
 }
 
 .data-table td {

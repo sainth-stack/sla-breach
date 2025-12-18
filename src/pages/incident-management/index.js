@@ -162,7 +162,7 @@ const IncidentManagement = () => {
     // Define header order and mapping
     const primaryHeaders = [
       { display: 'SNo', key: 'sno', isGenerated: true },
-      { display: 'Ticket Id', key: 'd_ticket_id' },
+      { display: 'Ticket ID', key: 'd_ticket_id' },
       { display: 'Brand', key: 'brand' },
       { display: 'Department', key: 'department' },
       { display: 'Location', key: 'location' },
@@ -172,8 +172,8 @@ const IncidentManagement = () => {
 
     // Column display name mapping
     const columnDisplayMap = {
-      'Text': 'summary',
-      'z_review': 'review'
+      'text': 'Summary',
+      'z_review': 'Review'
     };
 
     // Get all keys from the first record
