@@ -124,7 +124,7 @@ const IncidentManagement = () => {
     checkFileAndFetchData();
   }, []);
 
-  // Filter data based on search term (search in first column - request ID)
+  // Filter data based on search term (search in Ticket Id)
   useEffect(() => {
     if (!data) return;
     
@@ -142,26 +142,50 @@ const IncidentManagement = () => {
       return;
     }
 
-    // Filter based on first column (request ID)
+    // Filter based on Ticket Id (d_ticket_id)
     if (tableData.length > 0) {
-      const firstColumnKey = Object.keys(tableData[0])[0];
       const filtered = tableData.filter(row => {
-        const firstColumnValue = row[firstColumnKey];
-        return firstColumnValue && 
-               String(firstColumnValue).toLowerCase().includes(searchTerm.toLowerCase());
+        const ticketId = row['d_ticket_id'];
+        return ticketId && 
+               String(ticketId).toLowerCase().includes(searchTerm.toLowerCase());
       });
       setFilteredData(filtered);
     }
   }, [data, searchTerm]);
 
   const renderTable = () => {
+    console.log(data,'sdfosaifjd');
     if (!data || filteredData.length === 0) {
       return <div className="no-data">No data to display</div>;
     }
 
-    // Get headers from the first record
-    const headers = Object.keys(filteredData[0]);
-    const firstColumnKey = headers[0]; // For search label
+    // Define header order and mapping
+    const primaryHeaders = [
+      { display: 'SNo', key: 'sno', isGenerated: true },
+      { display: 'Ticket Id', key: 'd_ticket_id' },
+      { display: 'Department', key: 'department' },
+      { display: 'Location', key: 'location' },
+      { display: 'Site', key: 'site' },
+      { display: 'Name', key: 'brand' },
+      { display: 'Sub Functional Area', key: 'subfunctional_area' }
+    ];
+
+    // Get all keys from the first record
+    const allKeys = Object.keys(filteredData[0]);
+    
+    // Get the keys that are already in primary headers
+    const primaryKeys = primaryHeaders.map(h => h.key).filter(k => k !== 'sno');
+    
+    // Get remaining keys (not in primary headers, excluding count)
+    const remainingKeys = allKeys.filter(key => !primaryKeys.includes(key) && key !== 'count');
+    
+    // Create final headers array
+    const headers = [
+      ...primaryHeaders,
+      ...remainingKeys.map(key => ({ display: key, key: key }))
+    ];
+
+    const firstColumnKey = 'Ticket Id'; // For search label
 
     return (
       <div className="table-container">
@@ -194,20 +218,28 @@ const IncidentManagement = () => {
             <thead>
               <tr>
                 {headers.map((header, index) => (
-                  <th key={index}>{header}</th>
+                  <th key={index}>{header.display}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {filteredData.map((row, rowIndex) => (
                 <tr key={rowIndex}>
-                  {headers.map((header, colIndex) => (
-                    <td key={colIndex}>
-                      {row[header] !== null && row[header] !== undefined 
-                        ? String(row[header]) 
-                        : '-'}
-                    </td>
-                  ))}
+                  {headers.map((header, colIndex) => {
+                    let cellValue;
+                    if (header.isGenerated && header.key === 'sno') {
+                      cellValue = rowIndex + 1;
+                    } else {
+                      cellValue = row[header.key];
+                    }
+                    return (
+                      <td key={colIndex}>
+                        {cellValue !== null && cellValue !== undefined 
+                          ? String(cellValue) 
+                          : '-'}
+                      </td>
+                    );
+                  })}
                 </tr>
               ))}
             </tbody>
