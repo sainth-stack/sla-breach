@@ -10,6 +10,7 @@ import ComingSoon from "./pages/ComingSoon";
 import BIReport from "./pages/bi-report";
 import SLACombined from "./pages/sla-combined";
 import ResourceEffectivenessConsultant from "./pages/resource-effectiveness-consultant";
+import SystemMonitoring from "./pages/system-monitoring";
 
 function App() {
   return (
@@ -32,7 +33,9 @@ function App() {
             <Route path="/incidents-auto-assignment" element={<ComingSoon />} />
 
             {/* Batch Performance Section */}
-            <Route path="/thanksgiving-monitor" element={<ComingSoon />} />
+            <Route path="/process-monitor/thanksgiving" element={<ComingSoon />} />
+            <Route path="/system-monitoring" element={<SystemMonitoring />} />
+            <Route path="/system-monitoring/sap-system" element={<ComingSoon />} />
 
             {/* Resource Effectiveness Section */}
             <Route path="/resource-queue-length" element={<ComingSoon />} />

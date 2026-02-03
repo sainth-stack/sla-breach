@@ -193,16 +193,16 @@ export default function Sidebar() {
                   </div>
                   {expandedSections.batchPerformance && (
                     <ul className="subsection-list">
-                    <li className={`sidebar-item subsection ${location.pathname === "/thanksgiving-monitor" ? "active" : ""}`}>
-                        <Link to="/thanksgiving-monitor" className="sidebar-link">
-                          <MdEventNote size={14} className="link-icon" />
-                          <span className="link-text">% of Failures</span>
+                      <li className={`sidebar-item subsection ${location.pathname === "/process-monitor/thanksgiving" ? "active" : ""}`}>
+                        <Link to="/process-monitor/thanksgiving" className="sidebar-link">
+                          <MdSpeed size={14} className="link-icon" />
+                          <span className="link-text">Process Monitoring</span>
                         </Link>
                       </li>
-                      <li className={`sidebar-item subsection ${location.pathname === "/thanksgiving-monitor" ? "active" : ""}`}>
-                        <Link to="/thanksgiving-monitor" className="sidebar-link">
-                          <MdEventNote size={14} className="link-icon" />
-                          <span className="link-text">Thanksgiving Monitoring</span>
+                      <li className={`sidebar-item subsection ${location.pathname === "/system-monitoring" ? "active" : ""}`}>
+                        <Link to="/system-monitoring" className="sidebar-link">
+                          <MdVisibility size={14} className="link-icon" />
+                          <span className="link-text">System/Application Monitoring</span>
                         </Link>
                       </li>
                     </ul>
