@@ -13,9 +13,12 @@ const BatchMonitor = () => {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
+      if (!batchMonitorURL || typeof batchMonitorURL !== 'string') {
+        setError('Batch monitor URL is not configured. Check src/const.js');
+        return;
+      }
       const response = await axios.get(batchMonitorURL);
-      console.log(response,'resfsdfsdponse')
-      const jsonData =  response.data;
+      const jsonData = response.data;
       const processedData = jsonData.flatMap(entry => {
         const timestamp = Object.keys(entry)[0];
         return entry[timestamp].map(item => ({
@@ -28,7 +31,10 @@ const BatchMonitor = () => {
       setData(processedData);
       setError(null);
     } catch (err) {
-      setError(err.message);
+      const message = err.response
+        ? `Request failed: ${err.response.status} ${err.response.statusText}`
+        : err.message;
+      setError(message);
     } finally {
       setLoading(false);
     }
