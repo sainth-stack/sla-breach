@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Plot from 'react-plotly.js';
 import { batchMonitorURL } from '../../const';
 import './index.css';
+import axios from 'axios';
 
 const BatchMonitor = () => {
   const [data, setData] = useState([]);
@@ -12,10 +13,9 @@ const BatchMonitor = () => {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch(batchMonitorURL);
-      if (!response.ok) throw new Error('Failed to fetch IDoc data');
-      const jsonData = await response.json();
-
+      const response = await axios.get(batchMonitorURL);
+      console.log(response,'resfsdfsdponse')
+      const jsonData =  response.data;
       const processedData = jsonData.flatMap(entry => {
         const timestamp = Object.keys(entry)[0];
         return entry[timestamp].map(item => ({
