@@ -5,15 +5,13 @@ import Report from "./report";
 import { baseURL } from "../../const";
 import { processFileData, HOLIDAYS_BY_YEAR, YELLOW_FIELDS } from "../../utils/dataProcessor";
 import FloatingChatBot from "../../components/ChatBot/FloatingChatBot";
-import { useCsvData, useFileInfo, useHasValidFileInfo } from "../../utils/apiHooks";
+import { useCsvData } from "../../utils/apiHooks";
 
 // Note: Most utility functions are now imported from dataProcessor.js
 
 export const MainPages = () => {
   // Use React Query hooks for caching and API state management
   const { data: rawCsvData, isLoading, error: queryError, isError } = useCsvData();
-  const fileInfo = useFileInfo();
-  const hasValidFileInfo = useHasValidFileInfo();
 
   // Simplified function since heavy lifting is done in the utility - moved before useMemo
   const getHolidaysForYears = (years) => {
@@ -66,11 +64,8 @@ export const MainPages = () => {
     return { csvData: processedData, holidays: relevantHolidays };
   }, [rawCsvData]);
 
-  // Determine error state and message
+  // Determine error state and message (no upload condition - data loads from server by default)
   const error = useMemo(() => {
-    if (!hasValidFileInfo) {
-      return 'No data file found. Please upload a data file to begin analysis.';
-    }
     if (isError && queryError) {
       return queryError.message || 'Error loading data from server.';
     }
@@ -78,7 +73,7 @@ export const MainPages = () => {
       return 'Failed to process data. Please check the file format.';
     }
     return null;
-  }, [hasValidFileInfo, isError, queryError, rawCsvData, csvData]);
+  }, [isError, queryError, rawCsvData, csvData]);
 
   // Build dataset for chatbot from processed table (grouped by ticket) - memoized
   const chatDataset = useMemo(() => {

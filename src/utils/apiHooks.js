@@ -69,9 +69,9 @@ export const useCsvData = () => {
   const filename = fileInfo?.serverFilename || 'data1.csv';
   
   return useQuery({
-    queryKey: cacheKey,
+    queryKey: cacheKey || ['csv-data', 'default'],
     queryFn: () => fetchCsvData(filename),
-    enabled: !!fileInfo && !!cacheKey, // Only run query if we have file info
+    enabled: true, // Always load data from server (default or uploaded file)
     staleTime: 10 * 60 * 1000, // 10 minutes - data is considered fresh
     gcTime: 30 * 60 * 1000, // 30 minutes - how long to keep in cache
     retry: (failureCount, error) => {
