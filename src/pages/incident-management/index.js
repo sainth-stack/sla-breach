@@ -11,113 +11,104 @@ const IncidentManagement = () => {
   const [filteredData, setFilteredData] = useState([]);
   const [hasUploadedFile, setHasUploadedFile] = useState(false);
 
-  // Check for uploaded file and then fetch incident data
+  // Set hasUploadedFile from localStorage (for chatbot visibility); do not block API on it
   useEffect(() => {
-    const checkFileAndFetchData = async () => {
+    try {
+      const uploadedFileInfo = localStorage.getItem('uploadedFile');
+      if (uploadedFileInfo) {
+        const fileInfo = JSON.parse(uploadedFileInfo);
+        setHasUploadedFile(Boolean(fileInfo?.name));
+      } else {
+        setHasUploadedFile(false);
+      }
+    } catch {
+      setHasUploadedFile(false);
+    }
+  }, []);
+
+  // Always fetch incident data from API when page loads (no dependency on uploaded file)
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchIncidentData = async () => {
       setLoading(true);
       setError(null);
 
-      // First check if user has uploaded a file
-      const uploadedFileInfo = localStorage.getItem('uploadedFile');
-      if (!uploadedFileInfo) {
-        setHasUploadedFile(false);
-        setLoading(false);
-        return;
-      }
+      const cacheKey = 'incident_data_cache_v1';
+      const cacheTTLms = 5 * 60 * 1000; // 5 minutes TTL
+      const now = Date.now();
 
+      // Optional: serve from cache first
       try {
-        const fileInfo = JSON.parse(uploadedFileInfo);
-        if (!fileInfo.name) {
-          setHasUploadedFile(false);
-          setLoading(false);
-          return;
-        }
-        setHasUploadedFile(true);
-      } catch (error) {
-        console.error('Error parsing uploaded file info:', error);
-        setHasUploadedFile(false);
-        setLoading(false);
-        return;
-      }
-
-      // If file exists, fetch incident data (with caching)
-      try {
-        // Build cache key using endpoint and file identity
-        const cacheKey = 'incident_data_cache_v1';
-        const cacheTTLms = 5 * 60 * 1000; // 5 minutes TTL
-        const now = Date.now();
-
-        // Attempt cache read
-        try {
-          const cachedRaw = localStorage.getItem(cacheKey);
-          if (cachedRaw) {
-            const cached = JSON.parse(cachedRaw);
-            if (cached && cached.timestamp && (now - cached.timestamp) < cacheTTLms && cached.data) {
-              setData(cached.data);
-              // set filtered
-              if (Array.isArray(cached.data)) {
-                setFilteredData(cached.data);
-              } else if (cached.data?.records && Array.isArray(cached.data.records)) {
-                setFilteredData(cached.data.records);
-              } else if (typeof cached.data === 'object') {
-                setFilteredData([cached.data]);
-              }
-              setLoading(false);
-              return; // serve from cache
+        const cachedRaw = localStorage.getItem(cacheKey);
+        if (cachedRaw) {
+          const cached = JSON.parse(cachedRaw);
+          if (cached?.timestamp && (now - cached.timestamp) < cacheTTLms && cached.data != null) {
+            const cachedData = cached.data;
+            if (Array.isArray(cachedData)) {
+              setData(cachedData);
+              setFilteredData(cachedData);
+            } else if (cachedData?.records && Array.isArray(cachedData.records)) {
+              setData(cachedData);
+              setFilteredData(cachedData.records);
+            } else {
+              setData(cachedData);
+              setFilteredData(typeof cachedData === 'object' ? [cachedData] : []);
             }
+            setLoading(false);
+            return;
           }
-        } catch (e) {
-          console.warn('Incident cache read failed:', e);
         }
+      } catch (e) {
+        console.warn('Incident cache read failed:', e);
+      }
 
-        // No valid cache; fetch fresh
-        const response = await axios.get('https://ams-classifier.cfapps.us10-001.hana.ondemand.com/v1/classification/records', {
-        });
+      // Fetch from API (always called in deployment)
+      try {
+        const response = await axios.get(
+          'https://ams-classifier.cfapps.us10-001.hana.ondemand.com/v1/classification/records'
+        );
+        if (cancelled) return;
 
         const result = response.data;
-        
-        // Extract the actual data based on the API response structure
         let processedData;
-        if (result.response && Array.isArray(result.response)) {
-          // New API returns data in response array
+        if (result?.response && Array.isArray(result.response)) {
           processedData = result.response;
-        } else if (result.success && result.data) {
+        } else if (result?.success && result?.data) {
           processedData = result.data;
         } else if (Array.isArray(result)) {
           processedData = result;
         } else {
           processedData = result;
         }
-        
+
         setData(processedData);
-        
-        // Set initial filtered data
         if (Array.isArray(processedData)) {
           setFilteredData(processedData);
         } else if (processedData?.records && Array.isArray(processedData.records)) {
           setFilteredData(processedData.records);
         } else if (typeof processedData === 'object') {
           setFilteredData([processedData]);
+        } else {
+          setFilteredData([]);
         }
 
-        // Write to cache (best-effort)
         try {
-          const cachePayload = {
-            timestamp: now,
-            data: processedData
-          };
-          localStorage.setItem(cacheKey, JSON.stringify(cachePayload));
+          localStorage.setItem(cacheKey, JSON.stringify({ timestamp: now, data: processedData }));
         } catch (e) {
           console.warn('Incident cache write failed:', e);
         }
       } catch (err) {
-        setError(`Failed to load incident data: ${err.message}`);
+        if (!cancelled) {
+          setError(`Failed to load incident data: ${err.message}`);
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
-    checkFileAndFetchData();
+    fetchIncidentData();
+    return () => { cancelled = true; };
   }, []);
 
   // Filter data based on search term (search in Ticket Id)
@@ -150,7 +141,6 @@ const IncidentManagement = () => {
   }, [data, searchTerm]);
 
   const renderTable = () => {
-    console.log(data,'sdfosaifjd');
     if (!data || filteredData.length === 0) {
       return <div className="no-data">No data to display</div>;
     }
