@@ -189,8 +189,8 @@ const SharedFilters = ({
           />
         </div>
       </div>
-      <div className="flex justify-between items-center mt-4">
-        <div className="w-full max-w-md">
+      <div className="filter-search-row">
+        <div className="filter-search-group">
           <label className="filter-label">Search</label>
           <input
             type="text"
@@ -201,8 +201,9 @@ const SharedFilters = ({
           />
         </div>
         <button
+          type="button"
           onClick={onResetFilters}
-          className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors ml-4"
+          className="filter-reset-btn bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors border border-gray-200"
         >
           Reset Filters
         </button>

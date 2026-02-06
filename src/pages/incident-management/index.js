@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './index.css';
 import FloatingChatBot from '../../components/ChatBot/FloatingChatBot';
+import axios from 'axios';
 
 const IncidentManagement = () => {
   const [loading, setLoading] = useState(true);
@@ -70,15 +71,10 @@ const IncidentManagement = () => {
         }
 
         // No valid cache; fetch fresh
-        const response = await fetch('https://ams-classifier.cfapps.us10-001.hana.ondemand.com/v1/classification/records', {
-          method: 'GET',
+        const response = await axios.get('https://ams-classifier.cfapps.us10-001.hana.ondemand.com/v1/classification/records', {
         });
 
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const result = await response.json();
+        const result = response.data;
         
         // Extract the actual data based on the API response structure
         let processedData;

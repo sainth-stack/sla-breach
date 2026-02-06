@@ -18,13 +18,14 @@
     margin: 0;
 }
 
-.filter-section {
+/* Scoped to batch-monitor page only to avoid overlapping with data report filter-section */
+.batch-monitor-page .batch-monitor-header .filter-section {
     display: flex;
     gap: 12px;
     align-items: center;
 }
 
-.filter-btn {
+.batch-monitor-page .filter-btn {
     padding: 8px 16px;
     border: 1px solid #e2e8f0;
     background: white;
@@ -34,7 +35,7 @@
     transition: all 0.2s;
 }
 
-.filter-btn.active {
+.batch-monitor-page .filter-btn.active {
     background: #3182ce;
     color: white;
     border-color: #3182ce;

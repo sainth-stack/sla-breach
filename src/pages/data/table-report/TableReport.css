@@ -30,24 +30,24 @@
     margin: 0;
   }
   
-  /* Filter Section */
-  .filter-section {
+  /* Filter Section - scoped to report-card to avoid overlapping with other pages */
+  .report-card .filter-section {
     padding: 16px 24px;
     background-color: #f9fafb;
     border-bottom: 1px solid #e5e7eb;
   }
   
-  .filter-grid {
+  .report-card .filter-grid {
     display: grid;
     gap: 16px;
     grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   }
   
-  .filter-group {
+  .report-card .filter-group {
     margin-bottom: 0;
   }
   
-  .filter-label {
+  .report-card .filter-label {
     display: block;
     font-size: 0.875rem;
     font-weight: 500;
@@ -55,7 +55,7 @@
     margin-bottom: 8px;
   }
   
-  .filter-input {
+  .report-card .filter-input {
     width: 100%;
     padding: 8px 12px;
     border: 1px solid #d1d5db;
@@ -64,10 +64,33 @@
     transition: border-color 0.2s, box-shadow 0.2s;
   }
   
-  .filter-input:focus {
+  .report-card .filter-input:focus {
     outline: none;
     border-color: #3b82f6;
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+  
+  /* Search row: align label/input with filter grid, button with input */
+  .report-card .filter-search-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 16px;
+    align-items: end;
+    margin-top: 16px;
+  }
+  
+  .report-card .filter-search-row .filter-search-group {
+    min-width: 0;
+  }
+  
+  .report-card .filter-search-row .filter-search-group .filter-label {
+    margin-bottom: 8px;
+  }
+  
+  .report-card .filter-search-row .filter-reset-btn {
+    padding: 8px 16px;
+    min-height: 40px;
+    align-self: end;
   }
   
   /* Table Styles */
@@ -227,7 +250,7 @@
   
   /* Responsive Adjustments */
   @media (max-width: 768px) {
-    .filter-grid {
+    .report-card .filter-grid {
       grid-template-columns: 1fr;
     }
     
@@ -236,8 +259,12 @@
       border-radius: 8px;
     }
     
-    .report-header, .filter-section, .table-container, .pagination {
+    .report-header, .report-card .filter-section, .table-container, .pagination {
       padding: 16px;
+    }
+    
+    .report-card .filter-search-row {
+      grid-template-columns: 1fr;
     }
     
     .pagination {
@@ -255,18 +282,19 @@
     }
   }
   
-  /* React Select Customization */
-  .select__control {
+  /* React Select Customization - scoped under report card */
+  .report-card .select__control {
     min-height: 40px !important;
     border-radius: 6px !important;
     border-color: #d1d5db !important;
   }
   
-  .select__control--is-focused {
+  .report-card .select__control--is-focused {
     border-color: #3b82f6 !important;
     box-shadow: 0 0 0 1px #3b82f6 !important;
   }
   
+  /* Menu/options may render in portal - keep global for dropdown styling */
   .select__menu {
     border-radius: 6px !important;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
