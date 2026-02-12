@@ -196,7 +196,7 @@ export default function Sidebar() {
                       <li className={`sidebar-item subsection ${location.pathname === "/process-monitor/thanksgiving" ? "active" : ""}`}>
                         <Link to="/process-monitor/thanksgiving" className="sidebar-link">
                           <MdSpeed size={14} className="link-icon" />
-                          <span className="link-text">Batch Monitoring</span>
+                          <span className="link-text">Background Job Monitoring</span>
                         </Link>
                       </li>
                       <li className={`sidebar-item subsection ${location.pathname === "/system-monitoring" ? "active" : ""}`}>
