@@ -12,6 +12,7 @@ import SLACombined from "./pages/sla-combined";
 import ResourceEffectivenessConsultant from "./pages/resource-effectiveness-consultant";
 import SystemMonitoring from "./pages/system-monitoring";
 import BatchMonitor from "./pages/batch-monitor";
+import WebSuggestedActions from "./pages/web-suggested-actions";
 
 function App() {
   return (
@@ -44,7 +45,7 @@ function App() {
             <Route path="/resource-time-per-resolution" element={<ComingSoon />} />
 
             {/* Troubleshooting Assistance Section */}
-            <Route path="/web-suggested-actions" element={<ComingSoon />} />
+            <Route path="/web-suggested-actions" element={<WebSuggestedActions />} />
 
             {/* Value Creation Section */}
             <Route path="/preventive-measures" element={<ComingSoon />} />
