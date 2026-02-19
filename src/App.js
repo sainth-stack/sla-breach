@@ -13,6 +13,7 @@ import ResourceEffectivenessConsultant from "./pages/resource-effectiveness-cons
 import SystemMonitoring from "./pages/system-monitoring";
 import BatchMonitor from "./pages/batch-monitor";
 import WebSuggestedActions from "./pages/web-suggested-actions";
+import SelfServiceActions from "./pages/self-service-actions";
 
 function App() {
   return (
@@ -49,7 +50,7 @@ function App() {
 
             {/* Value Creation Section */}
             <Route path="/preventive-measures" element={<ComingSoon />} />
-            <Route path="/self-service-actions" element={<ComingSoon />} />
+            <Route path="/self-service-actions" element={<SelfServiceActions />} />
 
             {/* Potential Automation Section */}
             <Route path="/automation-target-areas" element={<ComingSoon />} />
