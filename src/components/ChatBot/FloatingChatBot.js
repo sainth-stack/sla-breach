@@ -534,9 +534,10 @@ const FloatingChatBot = ({
             </Box>
           </Box>
 
-          {/* Chat Messages Area */}
+          {/* Chat Messages Area - minHeight: 0 required for flex child to scroll */}
           <Box sx={{
-            flex: 1,
+            flex: "1 1 0",
+            minHeight: 0,
             overflow: "auto",
             padding: "16px",
             backgroundColor: "#f8fafc",

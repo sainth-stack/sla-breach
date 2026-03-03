@@ -130,7 +130,7 @@
     text-decoration: underline;
 }
 
-/* Overlay */
+/* Overlay - overflow hidden so only modal content scrolls */
 .ssa-overlay {
     position: fixed;
     inset: 0;
@@ -140,6 +140,7 @@
     justify-content: center;
     z-index: 1000;
     padding: 1rem;
+    overflow: hidden;
 }
 
 /* Bot Modal */
@@ -147,6 +148,7 @@
     width: 100%;
     max-width: 900px;
     height: 80vh;
+    max-height: 90vh;
     background: white;
     border-radius: 12px;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
@@ -204,23 +206,29 @@
     color: #475569;
 }
 
-/* Messages */
+/* Messages - scroll fix: min-height 0 lets flex child shrink and scroll */
 .bot-messages {
-    flex: 1;
+    flex: 1 1 0;
+    min-height: 0;
     overflow-y: auto;
+    overflow-x: hidden;
     padding: 1rem 1.25rem;
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
-    background: #fafafa;
+    align-items: flex-start;
+    background: #f8fafc;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
 }
 
 .bot-msg {
-    max-width: 85%;
+    max-width: 90%;
     padding: 0.6rem 0.9rem;
     border-radius: 10px;
     font-size: 0.875rem;
     line-height: 1.5;
+    flex-shrink: 0;
 }
 
 .bot-msg.user {
@@ -238,7 +246,7 @@
     border-bottom-left-radius: 3px;
     max-width: 100%;
     padding: 0;
-    overflow: hidden;
+    overflow: visible;
 }
 
 .bot-msg.bot span {
@@ -297,6 +305,39 @@
 .bot-send:disabled {
     opacity: 0.45;
     cursor: not-allowed;
+}
+
+/* SAP Response (friendly answer + table) */
+.sap-response {
+    padding: 0.6rem 0.9rem;
+    width: 100%;
+}
+
+.sap-friendly-answer {
+    margin: 0 0 0.75rem;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    color: #334155;
+    padding: 0;
+    background: transparent;
+}
+
+.sap-friendly-answer p {
+    margin: 0 0 0.5rem;
+}
+.sap-friendly-answer p:last-child {
+    margin-bottom: 0;
+}
+.sap-friendly-answer strong {
+    color: #1a202c;
+    font-weight: 600;
+}
+.sap-friendly-answer ul {
+    margin: 0.5rem 0 0;
+    padding-left: 1.25rem;
+}
+.sap-friendly-answer li {
+    margin-bottom: 0.35rem;
 }
 
 /* SAP Table */

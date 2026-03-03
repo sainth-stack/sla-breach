@@ -6,23 +6,35 @@ import eccLogo from '../../assets/ecc.jpeg';
 import s4CloudLogo from '../../assets/s4-cloud.jpg';
 import './index.css';
 
-// Format SAP OData date values
+// Format SAP OData date values (/Date(ts)/ or ISO string)
 const formatValue = (val) => {
     if (val === null || val === undefined || val === '') return '—';
     if (typeof val === 'boolean') return val ? 'Yes' : 'No';
     if (typeof val === 'string' && val.startsWith('/Date(')) {
-        const ts = parseInt(val.replace('/Date(', '').replace(')/', ''));
-        if (!isNaN(ts)) return new Date(ts).toLocaleDateString('en-GB');
+        const ts = parseInt(val.replace(/\/Date\(|\)\//g, '').split(/[+-]/)[0]);
+        if (!isNaN(ts)) return new Date(ts).toLocaleDateString('en-GB', { dateStyle: 'medium' });
+    }
+    if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}/.test(val)) {
+        const d = new Date(val);
+        return isNaN(d.getTime()) ? val : d.toLocaleDateString('en-GB', { dateStyle: 'medium' });
     }
     return String(val);
 };
 
-// Render SAP results as a simple table
+// Humanize column names (e.g. SalesOrder -> Sales Order)
+const humanizeColumn = (col) => col.replace(/([A-Z])/g, ' $1').replace(/^./, c => c.toUpperCase()).trim();
+
+// Columns to hide from table (internal/metadata)
+const HIDDEN_COLS = ['__metadata', 'url_used', 'intent_debug'];
+
+// Render SAP results - supports both single entity (d) and list (d.results)
 const SapTable = ({ data }) => {
-    const results = data?.response?.d?.results;
+    const d = data?.response?.d;
+    const results = Array.isArray(d?.results) ? d.results : (d && !d.results ? [d] : null);
     if (!results || results.length === 0) return <p className="sap-empty">No records found.</p>;
 
-    const columns = Object.keys(results[0]);
+    const rawColumns = Object.keys(results[0]).filter(c => !HIDDEN_COLS.includes(c));
+    const columns = rawColumns.length ? rawColumns : Object.keys(results[0]);
 
     return (
         <div className="sap-table-wrap">
@@ -30,7 +42,7 @@ const SapTable = ({ data }) => {
                 <thead>
                     <tr>
                         {columns.map(col => (
-                            <th key={col}>{col.replace(/([A-Z])/g, ' $1').trim()}</th>
+                            <th key={col}>{humanizeColumn(col)}</th>
                         ))}
                     </tr>
                 </thead>
@@ -99,7 +111,23 @@ const SapChatBot = ({ onClose }) => {
             <div className="bot-messages">
                 {messages.map((msg, idx) => (
                     <div key={idx} className={`bot-msg ${msg.type} ${msg.isError ? 'error' : ''}`}>
-                        {msg.sapData ? <SapTable data={msg.sapData} /> : <span>{msg.text}</span>}
+                        {msg.sapData ? (
+                            <div className="sap-response">
+                                {msg.sapData.friendlyAnswer && (
+                                    <div
+                                        className="sap-friendly-answer"
+                                        dangerouslySetInnerHTML={{ __html: msg.sapData.friendlyAnswer }}
+                                    />
+                                )}
+                                {msg.sapData.showTable && msg.sapData.response?.d?.results?.length > 0 ? (
+                                    <SapTable data={msg.sapData} />
+                                ) : !msg.sapData.friendlyAnswer ? (
+                                    <p className="sap-empty">No records found.</p>
+                                ) : null}
+                            </div>
+                        ) : (
+                            <span>{msg.text}</span>
+                        )}
                     </div>
                 ))}
                 {isLoading && (
