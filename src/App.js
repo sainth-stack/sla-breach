@@ -1,10 +1,11 @@
 import "./App.css";
-import { BrowserRouter as Router, Route, Routes, Link } from "react-router-dom";
+import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
 import SelfMonitoring from "./pages/self-monitoring";
 import IncidentManagement from "./pages/incident-management";
 import KEDB from "./pages/kedb";
 import DataSource from "./pages/data-source";
-import { AdminLayout } from './layout'
+import { AdminLayout } from './layout';
+import { Login } from "./pages/Login";
 import { MainPages } from "./pages/data";
 import ComingSoon from "./pages/ComingSoon";
 import BIReport from "./pages/bi-report";
@@ -20,6 +21,7 @@ function App() {
     <Router>
       <div className="App">
         <Routes>
+          <Route path="/login" element={<Login />} />
           <Route element={<AdminLayout />}>
             <Route path="/" element={<DataSource />} />
             <Route path="/data-source" element={<DataSource />} />
