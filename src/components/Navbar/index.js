@@ -1,26 +1,44 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { MdPerson, MdLogout } from 'react-icons/md';
+import { RiArrowDownSLine as ChevronDown } from 'react-icons/ri';
 import './styles.css';
 import lg1Logo from '../../assets/lg1.png';
 import lg2Logo from '../../assets/lg2.png';
 
+function getStoredUser() {
+  try {
+    const raw = localStorage.getItem('user');
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
 const Navbar = () => {
+  const navigate = useNavigate();
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+
+  const user = getStoredUser();
+
   useEffect(() => {
-    console.log('Navbar component mounted');
-    console.log('lg1Logo path:', lg1Logo);
-    console.log('lg2Logo path:', lg2Logo);
-    
-    // Check if images loaded successfully
-    const img1 = new Image();
-    const img2 = new Image();
-    
-    img1.onload = () => console.log('lg1 logo loaded successfully');
-    img1.onerror = () => console.error('Failed to load lg1 logo');
-    img1.src = lg1Logo;
-    
-    img2.onload = () => console.log('lg2 logo loaded successfully');
-    img2.onerror = () => console.error('Failed to load lg2 logo');
-    img2.src = lg2Logo;
+    const handleClickOutside = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setUserMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem('user');
+    localStorage.removeItem('token');
+    localStorage.removeItem('isAuthenticated');
+    setUserMenuOpen(false);
+    navigate('/login', { replace: true });
+  };
 
   return (
     <nav className="top-navbar">
@@ -32,7 +50,36 @@ const Navbar = () => {
           <span className="navbar-title">AMS ProEn</span>
         </div>
         <div className="navbar-right">
-          <img src={lg2Logo} alt="Logo 2" className="navbar-logo-right" />
+        <img src={lg2Logo} alt="Logo 2" className="navbar-logo-right" />
+          {user && (
+            <div className="navbar-user-menu" ref={menuRef}>
+              <button
+                type="button"
+                className="navbar-user-trigger"
+                onClick={() => setUserMenuOpen((o) => !o)}
+                aria-expanded={userMenuOpen}
+                aria-haspopup="true"
+                aria-label="User menu"
+              >
+                <span className="navbar-user-avatar">
+                  <MdPerson size={20} />
+                </span>
+                <span className="navbar-user-name">{user.name}</span>
+                <ChevronDown size={18} className={`navbar-user-chevron ${userMenuOpen ? 'open' : ''}`} />
+              </button>
+              {userMenuOpen && (
+                <div className="navbar-user-dropdown">
+                  <div className="navbar-user-dropdown-header">
+                    <span className="navbar-user-dropdown-email">{user.email}</span>
+                  </div>
+                  <button type="button" className="navbar-user-dropdown-item logout" onClick={handleLogout}>
+                    <MdLogout size={18} />
+                    <span>Log out</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </nav>

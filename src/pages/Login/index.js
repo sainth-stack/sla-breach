@@ -7,8 +7,8 @@ import "./index.css";
 
 // Only these two users; admin has full access, other user has limited (kedb + web-suggested-actions)
 const HARDCODED_USERS = [
-  { name: "Admin", email: "admin@gmail.com", password: "Test@123", isSuperAdmin: true },
-  { name: "Siva Yanamandra", email: "siva.yanamandra@seleccionconsulting.com", password: "A7k#P2xQ", isSuperAdmin: false },
+  { name: "Admin", email: "admin@selecccionconsulting.com", password: "Admin@123", isSuperAdmin: true },
+  { name: "Siva Yanamandra", email: "siva.yanamandra@seleccionconsulting.com", password: "Test@123", isSuperAdmin: false },
 ];
 
 function getStoredUser() {
