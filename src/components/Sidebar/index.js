@@ -27,7 +27,10 @@ import {
   MdLocationOn,
   MdNotifications,
   MdEventNote,
-  MdHistory
+  MdHistory,
+  MdAdminPanelSettings,
+  MdManageAccounts,
+  MdAssignmentInd
 } from "react-icons/md";
 import { Link, useLocation } from "react-router-dom";
 import { getAllowedPaths } from "../../utils/permissions";
@@ -46,12 +49,14 @@ export default function Sidebar() {
   const location = useLocation();
   const user = useMemo(getStoredUser, []);
   const isSuperAdmin = !!(user && user.isSuperAdmin);
-  const allowedPaths = getAllowedPaths(isSuperAdmin);
+  const allowedPaths = getAllowedPaths(isSuperAdmin, user?.allowedPaths);
 
   const canShow = (path) => allowedPaths === null || (allowedPaths && allowedPaths.includes(path));
+  const canShowAdmin = isSuperAdmin;
 
   const [expandedSections, setExpandedSections] = useState({
     amsProEn: false,
+    admin: false,
     sla: false,
     incidentManagement: false,
     troubleshooting: false,
@@ -461,6 +466,44 @@ export default function Sidebar() {
                             </Link>
                           </li>
                         )}
+                      </ul>
+                    )}
+                  </li>
+                )}
+
+                {/* Admin Section - only for super admin, at bottom */}
+                {canShowAdmin && (
+                  <li className="sidebar-section">
+                    <div
+                      className="section-header"
+                      onClick={() => toggleSection("admin")}
+                      role="button"
+                      tabIndex={0}
+                    >
+                      <div className="header-content">
+                        <MdAdminPanelSettings size={16} className="section-icon" />
+                        <span className="section-title">Admin</span>
+                      </div>
+                      {expandedSections.admin ? (
+                        <RiArrowDownSLine size={14} className="chevron-icon" />
+                      ) : (
+                        <RiArrowRightSLine size={14} className="chevron-icon" />
+                      )}
+                    </div>
+                    {expandedSections.admin && (
+                      <ul className="subsection-list">
+                        <li className={`sidebar-item subsection ${location.pathname === "/admin/roles" ? "active" : ""}`}>
+                          <Link to="/admin/roles" className="sidebar-link">
+                            <MdAssignmentInd size={14} className="link-icon" />
+                            <span className="link-text">Roles</span>
+                          </Link>
+                        </li>
+                        <li className={`sidebar-item subsection ${location.pathname === "/admin/users" ? "active" : ""}`}>
+                          <Link to="/admin/users" className="sidebar-link">
+                            <MdManageAccounts size={14} className="link-icon" />
+                            <span className="link-text">Users</span>
+                          </Link>
+                        </li>
                       </ul>
                     )}
                   </li>

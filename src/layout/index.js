@@ -28,8 +28,9 @@ export function AdminLayout() {
 
   // Based on permission: redirect to allowed default if path not allowed
   const isSuperAdmin = !!(user.isSuperAdmin);
+  const allowedPaths = user.allowedPaths ?? null;
   const path = location.pathname;
-  if (!canAccessPath(path, isSuperAdmin)) {
+  if (!canAccessPath(path, isSuperAdmin, allowedPaths)) {
     return <Navigate to={DEFAULT_PATH_FOR_LIMITED_USER} replace />;
   }
 

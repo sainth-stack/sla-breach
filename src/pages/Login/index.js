@@ -3,13 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { message } from "antd";
 import { MdVisibility, MdVisibilityOff } from "react-icons/md";
 import { DEFAULT_PATH_FOR_LIMITED_USER } from "../../utils/permissions";
+import { baseURL } from "../../const";
 import "./index.css";
-
-// Only these two users; admin has full access, other user has limited (kedb + web-suggested-actions)
-const HARDCODED_USERS = [
-  { name: "Admin", email: "admin@selecccionconsulting.com", password: "Admin@123", isSuperAdmin: true },
-  { name: "Siva Yanamandra", email: "siva.yanamandra@seleccionconsulting.com", password: "Test@123", isSuperAdmin: false },
-];
 
 function getStoredUser() {
   try {
@@ -43,28 +38,33 @@ export function Login() {
     event.preventDefault();
     setLoading(true);
 
-    const user = HARDCODED_USERS.find((u) => u.email.toLowerCase() === email.toLowerCase());
-
-    if (user && user.password === password) {
-      const userData = {
-        email: user.email,
-        name: user.name,
-        isAuthenticated: true,
-        isSuperAdmin: user.isSuperAdmin || false,
-        loginTime: new Date().toISOString(),
-      };
-
-      localStorage.setItem("user", JSON.stringify(userData));
-      localStorage.setItem("token", "authenticated");
-      localStorage.setItem("isAuthenticated", "true");
-
-      message.success(`Welcome ${user.name}!`);
-
-      setTimeout(() => {
-        navigate(user.isSuperAdmin ? "/" : "/kedb");
-      }, 500);
-    } else {
-      message.error("Invalid email or password. Please check your credentials.");
+    try {
+      const apiRes = await fetch(`${baseURL}/admin/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
+      });
+      if (apiRes.ok) {
+        const data = await apiRes.json();
+        const userData = {
+          email: data.email,
+          name: data.name,
+          isAuthenticated: true,
+          isSuperAdmin: data.is_super_admin || false,
+          allowedPaths: data.allowed_paths ?? null,
+          loginTime: new Date().toISOString(),
+        };
+        localStorage.setItem("user", JSON.stringify(userData));
+        localStorage.setItem("token", "authenticated");
+        localStorage.setItem("isAuthenticated", "true");
+        message.success(`Welcome ${data.name}!`);
+        const defaultPath = data.is_super_admin ? "/" : (data.allowed_paths && data.allowed_paths[0]) || DEFAULT_PATH_FOR_LIMITED_USER;
+        setTimeout(() => navigate(defaultPath), 500);
+      } else {
+        message.error("Invalid email or password. Please check your credentials.");
+      }
+    } catch (_) {
+      message.error("Unable to connect to server. Please try again.");
     }
 
     setLoading(false);

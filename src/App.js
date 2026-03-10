@@ -15,6 +15,8 @@ import SystemMonitoring from "./pages/system-monitoring";
 import BatchMonitor from "./pages/batch-monitor";
 import WebSuggestedActions from "./pages/web-suggested-actions";
 import SelfServiceActions from "./pages/self-service-actions";
+import AdminRoles from "./pages/admin/Roles";
+import AdminUsers from "./pages/admin/Users";
 
 function App() {
   return (
@@ -64,6 +66,10 @@ function App() {
 
             {/* BI Report */}
             <Route path="/bi-report" element={<BIReport />} />
+
+            {/* Admin - super admin only enforced in layout */}
+            <Route path="/admin/roles" element={<AdminRoles />} />
+            <Route path="/admin/users" element={<AdminUsers />} />
 
             {/* 404 fallback */}
             <Route path="*" element={<ComingSoon />} />
