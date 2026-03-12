@@ -33,13 +33,30 @@ const getUploadedFileInfo = () => {
   }
 };
 
-// API function to fetch CSV data
+// Get current user from localStorage (email/name for CSV filtering)
+const getCurrentUser = () => {
+  try {
+    const raw = localStorage.getItem('user');
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
+// API function to fetch CSV data (passes user email/name so backend can filter; admin gets all)
 const fetchCsvData = async (filename) => {
   if (!filename) {
     throw new Error('No filename provided');
   }
 
-  const response = await fetch(`${baseURL}/get_csv_data/${filename}`);
+  const user = getCurrentUser();
+  const params = new URLSearchParams();
+  if (user?.email) params.set('email', user.email);
+  if (user?.name) params.set('name', user.name);
+  const query = params.toString();
+  const url = query ? `${baseURL}/get_csv_data/${filename}?${query}` : `${baseURL}/get_csv_data/${filename}`;
+
+  const response = await fetch(url);
   
   if (!response.ok) {
     if (response.status === 404) {
