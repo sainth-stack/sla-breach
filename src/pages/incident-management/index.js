@@ -3,6 +3,52 @@ import './index.css';
 import FloatingChatBot from '../../components/ChatBot/FloatingChatBot';
 import axios from 'axios';
 
+// Classification API and cache keys (shared with Target Areas page)
+export const CLASSIFICATION_RECORDS_URL =
+  'https://ams-classifier.cfapps.us10-001.hana.ondemand.com/v1/classification/records';
+export const CLASSIFICATION_RECORDS_CACHE_KEY = 'classification_records_cache_v1';
+export const CLASSIFICATION_TARGET_AREAS_CACHE_KEY = 'classification_target_areas_v1';
+
+/**
+ * Compute department + subfunction + unique ticket count from classification records.
+ * Stores result in localStorage for Target Areas page.
+ */
+export function computeAndPersistTargetAreas(records) {
+  if (!Array.isArray(records) || records.length === 0) return [];
+  const deptKey = 'department';
+  const subKey = 'subfunctional_area';
+  const ticketKey = 'd_ticket_id';
+
+  const countByKey = new Map();
+  for (const row of records) {
+    const dept = row[deptKey] ?? '';
+    const sub = row[subKey] ?? '';
+    const key = `${dept}\n${sub}`;
+    if (!countByKey.has(key)) countByKey.set(key, { uniqueTickets: new Set() });
+    const ticketId = row[ticketKey];
+    if (ticketId != null && ticketId !== '') countByKey.get(key).uniqueTickets.add(String(ticketId));
+  }
+
+  const data = [];
+  countByKey.forEach((v, k) => {
+    const [department, subfunctional_area] = k.split('\n');
+    data.push({
+      department,
+      subfunctional_area,
+      uniqueTicketsCount: v.uniqueTickets.size,
+    });
+  });
+  try {
+    localStorage.setItem(
+      CLASSIFICATION_TARGET_AREAS_CACHE_KEY,
+      JSON.stringify({ timestamp: Date.now(), data })
+    );
+  } catch (e) {
+    console.warn('Target areas cache write failed:', e);
+  }
+  return data;
+}
+
 const IncidentManagement = () => {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState(null);
@@ -34,40 +80,35 @@ const IncidentManagement = () => {
       setLoading(true);
       setError(null);
 
-      const cacheKey = 'incident_data_cache_v1';
-      const cacheTTLms = 5 * 60 * 1000; // 5 minutes TTL
-      const now = Date.now();
+      // Use cache whenever it exists (avoids API call when navigating back to this page)
+      const cacheKeyToTry = CLASSIFICATION_RECORDS_CACHE_KEY;
+      const fallbackCacheKey = 'incident_data_cache_v1';
+      const cachedRaw =
+        localStorage.getItem(cacheKeyToTry) || localStorage.getItem(fallbackCacheKey);
 
-      // Optional: serve from cache first
-      try {
-        const cachedRaw = localStorage.getItem(cacheKey);
-        if (cachedRaw) {
+      if (cachedRaw) {
+        try {
           const cached = JSON.parse(cachedRaw);
-          if (cached?.timestamp && (now - cached.timestamp) < cacheTTLms && cached.data != null) {
-            const cachedData = cached.data;
-            if (Array.isArray(cachedData)) {
-              setData(cachedData);
-              setFilteredData(cachedData);
-            } else if (cachedData?.records && Array.isArray(cachedData.records)) {
-              setData(cachedData);
-              setFilteredData(cachedData.records);
-            } else {
-              setData(cachedData);
-              setFilteredData(typeof cachedData === 'object' ? [cachedData] : []);
-            }
+          const cachedData = cached?.data != null ? cached.data : cached;
+          if (cachedData != null) {
+            let records = [];
+            if (Array.isArray(cachedData)) records = cachedData;
+            else if (cachedData?.records && Array.isArray(cachedData.records)) records = cachedData.records;
+            else records = typeof cachedData === 'object' ? [cachedData] : [];
+            setData(cachedData);
+            setFilteredData(records);
+            computeAndPersistTargetAreas(records);
             setLoading(false);
             return;
           }
+        } catch (e) {
+          console.warn('Classification cache read failed:', e);
         }
-      } catch (e) {
-        console.warn('Incident cache read failed:', e);
       }
 
-      // Fetch from API (always called in deployment)
+      // No valid cache: fetch from classification API
       try {
-        const response = await axios.get(
-          'https://ams-classifier.cfapps.us10-001.hana.ondemand.com/v1/classification/records'
-        );
+        const response = await axios.get(CLASSIFICATION_RECORDS_URL);
         if (cancelled) return;
 
         const result = response.data;
@@ -82,21 +123,24 @@ const IncidentManagement = () => {
           processedData = result;
         }
 
+        const records = Array.isArray(processedData)
+          ? processedData
+          : processedData?.records && Array.isArray(processedData.records)
+            ? processedData.records
+            : typeof processedData === 'object' ? [processedData] : [];
+
         setData(processedData);
-        if (Array.isArray(processedData)) {
-          setFilteredData(processedData);
-        } else if (processedData?.records && Array.isArray(processedData.records)) {
-          setFilteredData(processedData.records);
-        } else if (typeof processedData === 'object') {
-          setFilteredData([processedData]);
-        } else {
-          setFilteredData([]);
-        }
+        setFilteredData(records);
+
+        computeAndPersistTargetAreas(records);
 
         try {
-          localStorage.setItem(cacheKey, JSON.stringify({ timestamp: now, data: processedData }));
+          localStorage.setItem(
+            CLASSIFICATION_RECORDS_CACHE_KEY,
+            JSON.stringify({ timestamp: Date.now(), data: processedData })
+          );
         } catch (e) {
-          console.warn('Incident cache write failed:', e);
+          console.warn('Classification cache write failed:', e);
         }
       } catch (err) {
         if (!cancelled) {
