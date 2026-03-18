@@ -39,6 +39,9 @@ export function computeAndPersistTargetAreas(records) {
     });
   });
   data.sort((a, b) => {
+    const countA = a.uniqueTicketsCount ?? 0;
+    const countB = b.uniqueTicketsCount ?? 0;
+    if (countB !== countA) return countB - countA;
     const deptCmp = (a.department ?? '').localeCompare(b.department ?? '', undefined, { sensitivity: 'base' });
     if (deptCmp !== 0) return deptCmp;
     return (a.subfunctional_area ?? '').localeCompare(b.subfunctional_area ?? '', undefined, { sensitivity: 'base' });

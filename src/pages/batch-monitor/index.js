@@ -81,12 +81,29 @@ const formatCell = (row, col) => {
   return String(val);
 };
 
+/** Get login time from stored user (set on login); used for last refreshed / next refresh */
+function getJobMonitorRefreshTimes() {
+  try {
+    const raw = localStorage.getItem('user');
+    const user = raw ? JSON.parse(raw) : null;
+    const loginTime = user?.loginTime;
+    if (!loginTime) return { lastRefreshed: null, nextRefresh: null };
+    const last = new Date(loginTime);
+    const next = new Date(last.getTime() + 60 * 60 * 1000);
+    return { lastRefreshed: last, nextRefresh: next };
+  } catch {
+    return { lastRefreshed: null, nextRefresh: null };
+  }
+}
+
 const BackgroundJobMonitoring = () => {
   const [selectedJob, setSelectedJob] = useState(JOB_OPTIONS[0]?.value || 'Z_I_FA_JOBS');
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [jobNameFilter, setJobNameFilter] = useState('');
+
+  const { lastRefreshed, nextRefresh } = useMemo(() => getJobMonitorRefreshTimes(), []);
 
   const apiUrl = `${backgroundJobMonitorBaseURL}/jobs/${selectedJob}`;
 
@@ -214,6 +231,8 @@ const BackgroundJobMonitoring = () => {
     [columnOrder]
   );
 
+  const formatDateTime = (d) => (d && !isNaN(d.getTime()) ? d.toLocaleString() : '—');
+
   return (
     <div className="batch-monitor-page">
       <header className="batch-monitor-header">
@@ -239,6 +258,11 @@ const BackgroundJobMonitoring = () => {
           </button>
         </div>
       </header>
+
+      <div className="job-monitor-status">
+        <span className="job-monitor-status-item">Last refreshed: {formatDateTime(lastRefreshed)}</span>
+        <span className="job-monitor-status-item">Next refresh: {formatDateTime(nextRefresh)}</span>
+      </div>
 
       <div className="chart-container table-container">
         {loading ? (

@@ -33,9 +33,7 @@ const Navbar = () => {
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem('user');
-    localStorage.removeItem('token');
-    localStorage.removeItem('isAuthenticated');
+    localStorage.clear();
     setUserMenuOpen(false);
     navigate('/login', { replace: true });
   };

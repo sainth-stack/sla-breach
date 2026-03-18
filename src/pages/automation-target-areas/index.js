@@ -28,6 +28,9 @@ const AutomationTargetAreas = () => {
           const cached = JSON.parse(cachedRaw);
           if (cached?.data && Array.isArray(cached.data) && cached.data.length > 0) {
             const sorted = [...cached.data].sort((a, b) => {
+              const countA = a.uniqueTicketsCount ?? 0;
+              const countB = b.uniqueTicketsCount ?? 0;
+              if (countB !== countA) return countB - countA;
               const deptCmp = (a.department ?? '').localeCompare(b.department ?? '', undefined, { sensitivity: 'base' });
               if (deptCmp !== 0) return deptCmp;
               return (a.subfunctional_area ?? '').localeCompare(b.subfunctional_area ?? '', undefined, { sensitivity: 'base' });
@@ -60,7 +63,7 @@ const AutomationTargetAreas = () => {
         }
 
         const data = computeAndPersistTargetAreas(records);
-        if (!cancelled) setTargetAreas(data);
+        if (!cancelled) setTargetAreas(data); // already sorted by count descending
       } catch (err) {
         if (!cancelled) setError(`Failed to load classification data: ${err.message}`);
       } finally {
@@ -81,6 +84,7 @@ const AutomationTargetAreas = () => {
       { display: 'Department', key: 'department' },
       { display: 'Sub Functional Area', key: 'subfunctional_area' },
       { display: 'Unique Tickets count', key: 'uniqueTicketsCount' },
+      { display: 'Avg Response Time', key: 'avgResponseTime', empty: true },
     ];
 
     return (
@@ -99,7 +103,9 @@ const AutomationTargetAreas = () => {
                 <tr key={rowIndex}>
                   {headers.map((h, colIndex) => (
                     <td key={colIndex}>
-                      {row[h.key] !== null && row[h.key] !== undefined && row[h.key] !== ''
+                      {h.empty
+                        ? '--'
+                        : row[h.key] !== null && row[h.key] !== undefined && row[h.key] !== ''
                         ? String(row[h.key])
                         : '-'}
                     </td>

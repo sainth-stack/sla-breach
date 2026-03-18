@@ -4,6 +4,8 @@ import { baseURL } from '../../const';
 import s4Logo from '../../assets/s4.png';
 import eccLogo from '../../assets/ecc.jpeg';
 import s4CloudLogo from '../../assets/s4-cloud.jpg';
+import sopLogo from '../../assets/sop-logo.png';
+import nlpLogo from '../../assets/nlp-logo.png';
 import './index.css';
 
 // Format SAP OData date values (/Date(ts)/ or ISO string)
@@ -56,6 +58,107 @@ const SapTable = ({ data }) => {
                     ))}
                 </tbody>
             </table>
+        </div>
+    );
+};
+
+const NLP_ENQUIRER_URL = 'https://ams-enquirer.cfapps.us10-001.hana.ondemand.com/api/v1/enquire/query';
+
+// Format NLP/Enquirer API response for display (handles various shapes)
+const formatNlpResponse = (data) => {
+    if (data == null) return 'No response.';
+    if (typeof data === 'string') return data;
+    if (typeof data === 'object') {
+        const text = data.answer ?? data.response ?? data.result ?? data.message ?? data.text;
+        if (text != null) return typeof text === 'string' ? text : JSON.stringify(text, null, 2);
+        return <pre className="sap-friendly-answer">{JSON.stringify(data, null, 2)}</pre>;
+    }
+    return String(data);
+};
+
+// Chat bot for NLP Analysis – same UI as S/4HANA, calls enquirer API
+const NlpChatBot = ({ onClose }) => {
+    const [message, setMessage] = useState('');
+    const [messages, setMessages] = useState([
+        { type: 'bot', text: 'Hello! I am your NLP Analysis assistant. Ask me anything in natural language.' }
+    ]);
+    const [isLoading, setIsLoading] = useState(false);
+    const messagesEndRef = useRef(null);
+    const inputRef = useRef(null);
+
+    useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+    useEffect(() => { inputRef.current?.focus(); }, []);
+
+    const sendMessage = async (e) => {
+        e?.preventDefault();
+        const trimmed = message.trim();
+        if (!trimmed || isLoading) return;
+
+        setMessages(prev => [...prev, { type: 'user', text: trimmed }]);
+        setMessage('');
+        setIsLoading(true);
+
+        try {
+            const res = await axios.post(NLP_ENQUIRER_URL, { query: trimmed });
+            const payload = res?.data;
+            const display = formatNlpResponse(payload);
+            setMessages(prev => [...prev, { type: 'bot', nlpData: { raw: payload, display } }]);
+        } catch (err) {
+            const detail = err?.response?.data?.detail ?? err?.response?.data?.message ?? err.message ?? 'Something went wrong.';
+            setMessages(prev => [...prev, { type: 'bot', text: `Error: ${detail}`, isError: true }]);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    return (
+        <div className="bot-modal">
+            <div className="bot-header">
+                <div className="bot-header-left">
+                    <img src={nlpLogo} alt="NLP Analysis" className="bot-logo" />
+                    <div>
+                        <div className="bot-title">NLP Analysis</div>
+                        <div className="bot-subtitle">Natural language processing insights</div>
+                    </div>
+                </div>
+                <button className="bot-close" onClick={onClose}>✕</button>
+            </div>
+
+            <div className="bot-messages">
+                {messages.map((msg, idx) => (
+                    <div key={idx} className={`bot-msg ${msg.type} ${msg.isError ? 'error' : ''}`}>
+                        {msg.nlpData ? (
+                            <div className="sap-response">
+                                <div className="sap-friendly-answer">
+                                    {typeof msg.nlpData.display === 'string'
+                                        ? msg.nlpData.display
+                                        : msg.nlpData.display}
+                                </div>
+                            </div>
+                        ) : (
+                            <span>{msg.text}</span>
+                        )}
+                    </div>
+                ))}
+                {isLoading && (
+                    <div className="bot-msg bot">
+                        <span className="bot-loading">Thinking…</span>
+                    </div>
+                )}
+                <div ref={messagesEndRef} />
+            </div>
+
+            <form className="bot-input-bar" onSubmit={sendMessage}>
+                <input
+                    ref={inputRef}
+                    className="bot-input"
+                    value={message}
+                    onChange={e => setMessage(e.target.value)}
+                    placeholder="Ask your question in natural language"
+                    disabled={isLoading}
+                />
+                <button type="submit" className="bot-send" disabled={isLoading || !message.trim()}>Send</button>
+            </form>
         </div>
     );
 };
@@ -156,14 +259,14 @@ const SapChatBot = ({ onClose }) => {
 
 // Main page
 const SelfServiceActions = () => {
-    const [botOpen, setBotOpen] = useState(false);
+    const [openBotId, setOpenBotId] = useState(null);
 
     const cards = [
         { id: 's4', title: 'S/4HANA', desc: 'Query Sales Orders, Purchase Orders and more.', logo: s4Logo, available: true, badge: 'Live' },
         { id: 'btp', title: 'SAP ECC', desc: 'Self Service for SAP ECC system.', logo: eccLogo, available: false, badge: 'Soon' },
         { id: 'batch', title: 'SAP S/4 Cloud', desc: 'Self Service for SAP S/4 Cloud system.', logo: s4CloudLogo, available: false, badge: 'Soon' },
-        { id: 'sop-know-errors', title: 'SOP - Know Errors', desc: 'Standard operating procedures and known errors.', logo: null, available: false, badge: 'Coming Soon' },
-        { id: 'nlp-analysis', title: 'NLP Analysis', desc: 'Natural language processing insights.', logo: null, available: false, badge: 'Coming Soon' },
+        { id: 'sop-know-errors', title: 'SOP - Know Errors', desc: 'Standard operating procedures and known errors.', logo: sopLogo, available: false, badge: 'Coming Soon' },
+        { id: 'nlp-analysis', title: 'NLP Analysis', desc: 'Natural language processing insights.', logo: nlpLogo, available: true, badge: 'Live' },
     ];
 
     return (
@@ -176,7 +279,7 @@ const SelfServiceActions = () => {
                     <div
                         key={card.id}
                         className={`ssa-card ${card.available ? 'active' : 'inactive'}`}
-                        onClick={() => card.available && setBotOpen(true)}
+                        onClick={() => card.available && setOpenBotId(card.id)}
                     >
                         <span className={`ssa-card-badge ${card.available ? 'live' : 'soon'}`}>{card.badge || 'Soon'}</span>
                         <div className="ssa-card-logo">
@@ -191,9 +294,10 @@ const SelfServiceActions = () => {
                 ))}
             </div>
 
-            {botOpen && (
-                <div className="ssa-overlay" onClick={e => e.target === e.currentTarget && setBotOpen(false)}>
-                    <SapChatBot onClose={() => setBotOpen(false)} />
+            {openBotId && (
+                <div className="ssa-overlay" onClick={e => e.target === e.currentTarget && setOpenBotId(null)}>
+                    {openBotId === 's4' && <SapChatBot onClose={() => setOpenBotId(null)} />}
+                    {openBotId === 'nlp-analysis' && <NlpChatBot onClose={() => setOpenBotId(null)} />}
                 </div>
             )}
         </div>

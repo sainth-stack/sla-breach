@@ -11,8 +11,23 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 24px;
+    margin-bottom: 12px;
     flex-shrink: 0;
+}
+
+.job-monitor-status {
+    display: flex;
+    gap: 24px;
+    margin-bottom: 16px;
+    padding: 10px 14px;
+    background: #edf2f7;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #4a5568;
+}
+
+.job-monitor-status-item {
+    white-space: nowrap;
 }
 
 .batch-monitor-title {
