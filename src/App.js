@@ -1,6 +1,5 @@
 import "./App.css";
 import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
-import SelfMonitoring from "./pages/self-monitoring";
 import IncidentManagement from "./pages/incident-management";
 import KEDB from "./pages/kedb";
 import DataSource from "./pages/data-source";
@@ -13,10 +12,12 @@ import SLACombined from "./pages/sla-combined";
 import ResourceEffectivenessConsultant from "./pages/resource-effectiveness-consultant";
 import SystemMonitoring from "./pages/system-monitoring";
 import BatchMonitor from "./pages/batch-monitor";
+import JobConfiguration from "./pages/batch-monitor/JobConfiguration";
 import WebSuggestedActions from "./pages/web-suggested-actions";
 import SelfServiceActions from "./pages/self-service-actions";
 import AdminRoles from "./pages/admin/Roles";
 import AdminUsers from "./pages/admin/Users";
+import AutomationTargetAreas from "./pages/automation-target-areas";
 
 function App() {
   return (
@@ -39,7 +40,8 @@ function App() {
             <Route path="/incidents-recurring" element={<ComingSoon />} />
             <Route path="/incidents-auto-assignment" element={<ComingSoon />} />
 
-            {/* Performance Monitoring Section */}
+            {/* Performance Monitoring Section - Background Job Monitoring */}
+            <Route path="/process-monitor/thanksgiving/configuration" element={<JobConfiguration />} />
             <Route path="/process-monitor/thanksgiving" element={<BatchMonitor />} />
             <Route path="/system-monitoring" element={<SystemMonitoring />} />
             <Route path="/system-monitoring/sap-system" element={<ComingSoon />} />
@@ -57,7 +59,7 @@ function App() {
             <Route path="/self-service-actions" element={<SelfServiceActions />} />
 
             {/* Potential Automation Section */}
-            <Route path="/automation-target-areas" element={<ComingSoon />} />
+            <Route path="/automation-target-areas" element={<AutomationTargetAreas />} />
             <Route path="/automation-preventive-alerts" element={<ComingSoon />} />
 
             {/* Effectiveness of Measures Section */}

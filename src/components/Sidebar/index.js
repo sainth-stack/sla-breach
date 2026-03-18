@@ -61,6 +61,7 @@ export default function Sidebar() {
     incidentManagement: false,
     troubleshooting: false,
     batchPerformance: false,
+    backgroundJobMonitoring: false,
     resourceEffectiveness: false,
     areasOfImprovement: false,
     potentialAutomation: false,
@@ -233,11 +234,39 @@ export default function Sidebar() {
                     {expandedSections.batchPerformance && (
                       <ul className="subsection-list">
                         {canShow("/process-monitor/thanksgiving") && (
-                          <li className={`sidebar-item subsection ${location.pathname === "/process-monitor/thanksgiving" ? "active" : ""}`}>
-                            <Link to="/process-monitor/thanksgiving" className="sidebar-link">
-                              <MdSpeed size={14} className="link-icon" />
-                              <span className="link-text">Background Job Monitoring</span>
-                            </Link>
+                          <li className="sidebar-section">
+                            <div
+                              className="section-header"
+                              onClick={() => toggleSection("backgroundJobMonitoring")}
+                              role="button"
+                              tabIndex={0}
+                            >
+                              <div className="header-content">
+                                <MdSpeed size={14} className="section-icon" />
+                                <span className="section-title">Background Job Monitoring</span>
+                              </div>
+                              {expandedSections.backgroundJobMonitoring ? (
+                                <RiArrowDownSLine size={14} className="chevron-icon" />
+                              ) : (
+                                <RiArrowRightSLine size={14} className="chevron-icon" />
+                              )}
+                            </div>
+                            {expandedSections.backgroundJobMonitoring && (
+                              <ul className="subsection-list nested">
+                                <li className={`sidebar-item subsection ${location.pathname === "/process-monitor/thanksgiving/configuration" ? "active" : ""}`}>
+                                  <Link to="/process-monitor/thanksgiving/configuration" className="sidebar-link">
+                                    <MdBuild size={14} className="link-icon" />
+                                    <span className="link-text">Configuration</span>
+                                  </Link>
+                                </li>
+                                <li className={`sidebar-item subsection ${location.pathname === "/process-monitor/thanksgiving" ? "active" : ""}`}>
+                                  <Link to="/process-monitor/thanksgiving" className="sidebar-link">
+                                    <MdVisibility size={14} className="link-icon" />
+                                    <span className="link-text">Monitoring</span>
+                                  </Link>
+                                </li>
+                              </ul>
+                            )}
                           </li>
                         )}
                         {canShow("/system-monitoring") && (

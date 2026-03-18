@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { message } from "antd";
 import { MdVisibility, MdVisibilityOff } from "react-icons/md";
-import { DEFAULT_PATH_FOR_LIMITED_USER } from "../../utils/permissions";
+import { getDefaultPathForUser } from "../../utils/permissions";
 import { baseURL } from "../../const";
 import "./index.css";
 
@@ -22,14 +22,13 @@ export function Login() {
   const [password, setPassword] = useState("");
   const navigate = useNavigate();
 
-  // If already logged in, redirect based on permission (don't show login form)
+  // If already logged in, redirect to default path (same logic as post-login).
   useEffect(() => {
     const token = localStorage.getItem("token");
     const isAuth = localStorage.getItem("isAuthenticated") === "true";
     const user = getStoredUser();
     if (token && isAuth && user) {
-      const isSuperAdmin = !!(user.isSuperAdmin);
-      const defaultPath = isSuperAdmin ? "/" : DEFAULT_PATH_FOR_LIMITED_USER;
+      const defaultPath = getDefaultPathForUser(!!(user.isSuperAdmin), user.allowedPaths ?? null);
       navigate(defaultPath, { replace: true });
     }
   }, [navigate]);
@@ -58,7 +57,7 @@ export function Login() {
         localStorage.setItem("token", "authenticated");
         localStorage.setItem("isAuthenticated", "true");
         message.success(`Welcome ${data.name}!`);
-        const defaultPath = data.is_super_admin ? "/" : (data.allowed_paths && data.allowed_paths[0]) || DEFAULT_PATH_FOR_LIMITED_USER;
+        const defaultPath = getDefaultPathForUser(!!data.is_super_admin, data.allowed_paths ?? null);
         setTimeout(() => navigate(defaultPath), 500);
       } else {
         message.error("Invalid email or password. Please check your credentials.");

@@ -3,7 +3,7 @@ import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
 import "./style.css";
 import { Outlet, Navigate, useLocation } from "react-router-dom";
-import { canAccessPath, DEFAULT_PATH_FOR_LIMITED_USER } from "../utils/permissions";
+import { canAccessPath, getDefaultPathForUser } from "../utils/permissions";
 
 function getStoredUser() {
   try {
@@ -26,12 +26,13 @@ export function AdminLayout() {
     return <Navigate to="/login" replace />;
   }
 
-  // Based on permission: redirect to allowed default if path not allowed
+  // Based on permission: redirect to user's default (first allowed path) if current path not allowed
   const isSuperAdmin = !!(user.isSuperAdmin);
   const allowedPaths = user.allowedPaths ?? null;
   const path = location.pathname;
   if (!canAccessPath(path, isSuperAdmin, allowedPaths)) {
-    return <Navigate to={DEFAULT_PATH_FOR_LIMITED_USER} replace />;
+    const defaultPath = getDefaultPathForUser(isSuperAdmin, allowedPaths);
+    return <Navigate to={defaultPath} replace />;
   }
 
   return (
