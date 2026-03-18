@@ -129,14 +129,14 @@ const JobConfiguration = () => {
               <tr>
                 <th>Job Name</th>
                 <th>System</th>
-                <th colSpan={2}>Time Period</th>
+                <th colSpan={2} className="job-config-time-period-header">Time Period</th>
                 <th className="admin-th-actions">Actions</th>
               </tr>
               <tr className="job-config-period-subhead">
                 <th></th>
                 <th></th>
-                <th>Period Start</th>
-                <th>Period End</th>
+                <th className="job-config-period-subhead-cell">Period Start</th>
+                <th className="job-config-period-subhead-cell">Period End</th>
                 <th></th>
               </tr>
             </thead>
@@ -152,8 +152,8 @@ const JobConfiguration = () => {
                   <tr key={job.id}>
                     <td className="admin-td-name">{job.jobName}</td>
                     <td>{job.system}</td>
-                    <td>{job.periodStart}</td>
-                    <td>{job.periodEnd}</td>
+                    <td className="job-config-period-cell">{job.periodStart}</td>
+                    <td className="job-config-period-cell">{job.periodEnd}</td>
                     <td className="admin-td-actions">
                       <button
                         type="button"

@@ -3,6 +3,11 @@
   padding: 32px;
 }
 
+/* Time Period header centred over Start/End columns */
+.job-config-time-period-header {
+  text-align: center;
+}
+
 /* Period: one header "Time Period" with two sub-columns */
 .job-config-period-subhead th {
   font-weight: 500;
@@ -10,4 +15,12 @@
   color: #64748b;
   border-top: none;
   padding-top: 0;
+}
+
+.job-config-period-subhead-cell {
+  text-align: center;
+}
+
+.job-config-period-cell {
+  text-align: center;
 }

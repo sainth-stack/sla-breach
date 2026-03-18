@@ -345,7 +345,7 @@ export default function Sidebar() {
                           <li className={`sidebar-item subsection ${location.pathname === "/suggested-actions-depository" ? "active" : ""}`}>
                             <Link to="/suggested-actions-depository" className="sidebar-link">
                               <MdStorage size={14} className="link-icon" />
-                              <span className="link-text">Suggested Actions - Depository</span>
+                              <span className="link-text">Suggested Actions - Repository</span>
                             </Link>
                           </li>
                         )}

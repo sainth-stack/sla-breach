@@ -27,7 +27,12 @@ const AutomationTargetAreas = () => {
         if (cachedRaw) {
           const cached = JSON.parse(cachedRaw);
           if (cached?.data && Array.isArray(cached.data) && cached.data.length > 0) {
-            setTargetAreas(cached.data);
+            const sorted = [...cached.data].sort((a, b) => {
+              const deptCmp = (a.department ?? '').localeCompare(b.department ?? '', undefined, { sensitivity: 'base' });
+              if (deptCmp !== 0) return deptCmp;
+              return (a.subfunctional_area ?? '').localeCompare(b.subfunctional_area ?? '', undefined, { sensitivity: 'base' });
+            });
+            setTargetAreas(sorted);
             setLoading(false);
             return;
           }

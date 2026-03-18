@@ -38,6 +38,11 @@ export function computeAndPersistTargetAreas(records) {
       uniqueTicketsCount: v.uniqueTickets.size,
     });
   });
+  data.sort((a, b) => {
+    const deptCmp = (a.department ?? '').localeCompare(b.department ?? '', undefined, { sensitivity: 'base' });
+    if (deptCmp !== 0) return deptCmp;
+    return (a.subfunctional_area ?? '').localeCompare(b.subfunctional_area ?? '', undefined, { sensitivity: 'base' });
+  });
   try {
     localStorage.setItem(
       CLASSIFICATION_TARGET_AREAS_CACHE_KEY,
