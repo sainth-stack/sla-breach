@@ -1,16 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { MdAccountTree } from 'react-icons/md';
 import {
   CLASSIFICATION_RECORDS_URL,
   CLASSIFICATION_TARGET_AREAS_CACHE_KEY,
   computeAndPersistTargetAreas,
 } from '../incident-management';
 import '../incident-management/index.css';
+import './index.css';
 
 const AutomationTargetAreas = () => {
   const [loading, setLoading] = useState(true);
   const [targetAreas, setTargetAreas] = useState([]);
   const [error, setError] = useState(null);
+  const [view, setView] = useState('tiles'); // 'tiles' | 'table'
 
   useEffect(() => {
     let cancelled = false;
@@ -19,7 +22,6 @@ const AutomationTargetAreas = () => {
       setLoading(true);
       setError(null);
 
-      // 1. Try localStorage first (classification details from Incident Management or previous visit)
       try {
         const cachedRaw = localStorage.getItem(CLASSIFICATION_TARGET_AREAS_CACHE_KEY);
         if (cachedRaw) {
@@ -34,7 +36,6 @@ const AutomationTargetAreas = () => {
         console.warn('Target areas cache read failed:', e);
       }
 
-      // 2. Not in localStorage: call classification API, compute, store, then show
       try {
         const response = await axios.get(CLASSIFICATION_RECORDS_URL);
         if (cancelled) return;
@@ -68,7 +69,7 @@ const AutomationTargetAreas = () => {
 
   const renderTable = () => {
     if (targetAreas.length === 0) {
-      return <div className="no-data">No target areas data to display</div>;
+      return <div className="target-areas-no-data">No target areas data to display</div>;
     }
 
     const headers = [
@@ -106,6 +107,24 @@ const AutomationTargetAreas = () => {
       </div>
     );
   };
+
+  const renderTiles = () => (
+    <div className="target-areas-tiles">
+      <div
+        className="target-areas-tile target-areas-tile-active"
+        onClick={() => setView('table')}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => e.key === 'Enter' && setView('table')}
+      >
+        <div className="target-areas-tile-icon-wrap">
+          <MdAccountTree size={40} className="target-areas-tile-icon" />
+        </div>
+        <span className="target-areas-tile-name">Work stream wise</span>
+        <span className="target-areas-tile-action">View table →</span>
+      </div>
+    </div>
+  );
 
   if (loading) {
     return (
@@ -145,14 +164,30 @@ const AutomationTargetAreas = () => {
       <div className="text-page-content">
         <div className="page-header">
           <h1>Target Areas</h1>
-          <p>Department and subfunction breakdown by unique ticket count (from classification)</p>
+          <p>
+            {view === 'tiles'
+              ? 'Select a view to see department and subfunction breakdown'
+              : 'Department and subfunction breakdown by unique ticket count (from classification)'}
+          </p>
         </div>
 
         <div className="data-section">
           {error && <div className="error-message">{error}</div>}
         </div>
 
-        {!error && renderTable()}
+        {!error && view === 'tiles' && renderTiles()}
+        {!error && view === 'table' && (
+          <>
+            <button
+              type="button"
+              className="target-areas-back-btn"
+              onClick={() => setView('tiles')}
+            >
+              ← Back to tiles
+            </button>
+            {renderTable()}
+          </>
+        )}
       </div>
     </div>
   );

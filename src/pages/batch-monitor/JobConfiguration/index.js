@@ -1,13 +1,22 @@
 import React, { useState } from "react";
 import { message } from "antd";
+import { MdWork, MdComputer, MdSchedule } from "react-icons/md";
 import "../../admin/common.css";
 import "./index.css";
 
-/** Static initial jobs for demo (no API) */
+/** Default: one record - job name, system S4 Hana, period start/end date and time */
+const defaultPeriodStart = () => {
+  const d = new Date();
+  return d.toLocaleString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).replace(",", ",");
+};
+const defaultPeriodEnd = () => {
+  const d = new Date();
+  d.setHours(23, 59, 59, 999);
+  return d.toLocaleString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).replace(",", ",");
+};
+
 const INITIAL_JOBS = [
-  { id: 1, jobName: "Z_I_FA_JOBS", system: "SAP ECC", timePeriod: "Daily" },
-  { id: 2, jobName: "Z_C_JOBHEADER", system: "SAP S/4HANA", timePeriod: "Every 6 hours" },
-  { id: 3, jobName: "FIN_434", system: "SAP Retail", timePeriod: "Hourly" },
+  { id: 1, jobName: "/1DH/CDC_HEALTH_CHECK", system: "S4 Hana", periodStart: defaultPeriodStart(), periodEnd: defaultPeriodEnd() },
 ];
 
 const JobConfiguration = () => {
@@ -17,12 +26,18 @@ const JobConfiguration = () => {
   const [form, setForm] = useState({
     jobName: "",
     system: "",
-    timePeriod: "",
+    periodStart: "",
+    periodEnd: "",
   });
 
   const openCreate = () => {
     setEditingId(null);
-    setForm({ jobName: "", system: "", timePeriod: "" });
+    setForm({
+      jobName: "",
+      system: "",
+      periodStart: defaultPeriodStart(),
+      periodEnd: defaultPeriodEnd(),
+    });
     setModalOpen(true);
   };
 
@@ -31,7 +46,8 @@ const JobConfiguration = () => {
     setForm({
       jobName: job.jobName,
       system: job.system,
-      timePeriod: job.timePeriod,
+      periodStart: job.periodStart || defaultPeriodStart(),
+      periodEnd: job.periodEnd || defaultPeriodEnd(),
     });
     setModalOpen(true);
   };
@@ -45,8 +61,12 @@ const JobConfiguration = () => {
       message.warning("System is required");
       return;
     }
-    if (!form.timePeriod.trim()) {
-      message.warning("Time Period is required");
+    if (!form.periodStart.trim()) {
+      message.warning("Period Start is required");
+      return;
+    }
+    if (!form.periodEnd.trim()) {
+      message.warning("Period End is required");
       return;
     }
     if (editingId) {
@@ -57,7 +77,8 @@ const JobConfiguration = () => {
                 ...j,
                 jobName: form.jobName.trim(),
                 system: form.system.trim(),
-                timePeriod: form.timePeriod.trim(),
+                periodStart: form.periodStart.trim(),
+                periodEnd: form.periodEnd.trim(),
               }
             : j
         )
@@ -71,7 +92,8 @@ const JobConfiguration = () => {
           id: nextId,
           jobName: form.jobName.trim(),
           system: form.system.trim(),
-          timePeriod: form.timePeriod.trim(),
+          periodStart: form.periodStart.trim(),
+          periodEnd: form.periodEnd.trim(),
         },
       ]);
       message.success("Job created");
@@ -91,7 +113,7 @@ const JobConfiguration = () => {
         <div className="header-section">
           <h1 className="page-title">Job Configuration</h1>
           <p className="page-subtitle">
-            Configure background jobs: Job Name, System, and Time Period
+            Configure background jobs: Job Name, System, and Time Period (Start & End)
           </p>
         </div>
 
@@ -102,19 +124,26 @@ const JobConfiguration = () => {
         </div>
 
         <div className="admin-table-wrap">
-          <table className="admin-table">
+          <table className="admin-table job-config-table">
             <thead>
               <tr>
                 <th>Job Name</th>
                 <th>System</th>
-                <th>Time Period</th>
+                <th colSpan={2}>Time Period</th>
                 <th className="admin-th-actions">Actions</th>
+              </tr>
+              <tr className="job-config-period-subhead">
+                <th></th>
+                <th></th>
+                <th>Period Start</th>
+                <th>Period End</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
               {jobs.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="admin-empty">
+                  <td colSpan={5} className="admin-empty">
                     No jobs configured. Add a job to get started.
                   </td>
                 </tr>
@@ -123,7 +152,8 @@ const JobConfiguration = () => {
                   <tr key={job.id}>
                     <td className="admin-td-name">{job.jobName}</td>
                     <td>{job.system}</td>
-                    <td>{job.timePeriod}</td>
+                    <td>{job.periodStart}</td>
+                    <td>{job.periodEnd}</td>
                     <td className="admin-td-actions">
                       <button
                         type="button"
@@ -154,38 +184,62 @@ const JobConfiguration = () => {
                 {editingId ? "Edit Job" : "Add Job"}
               </h2>
               <div className="admin-form-group">
-                <label>Job Name</label>
+                <label>
+                  <MdWork size={16} style={{ verticalAlign: "middle", marginRight: 6 }} />
+                  Job Name
+                </label>
                 <input
                   type="text"
                   value={form.jobName}
                   onChange={(e) =>
                     setForm((f) => ({ ...f, jobName: e.target.value }))
                   }
-                  placeholder="e.g. Z_I_FA_JOBS"
+                  placeholder="e.g. /1DH/CDC_HEALTH_CHECK"
                   className="admin-input"
                 />
               </div>
               <div className="admin-form-group">
-                <label>System</label>
+                <label>
+                  <MdComputer size={16} style={{ verticalAlign: "middle", marginRight: 6 }} />
+                  System
+                </label>
                 <input
                   type="text"
                   value={form.system}
                   onChange={(e) =>
                     setForm((f) => ({ ...f, system: e.target.value }))
                   }
-                  placeholder="e.g. SAP ECC"
+                  placeholder="e.g. S4 Hana"
                   className="admin-input"
                 />
               </div>
               <div className="admin-form-group">
-                <label>Time Period</label>
+                <label>
+                  <MdSchedule size={16} style={{ verticalAlign: "middle", marginRight: 6 }} />
+                  Period Start (Date & Time)
+                </label>
                 <input
                   type="text"
-                  value={form.timePeriod}
+                  value={form.periodStart}
                   onChange={(e) =>
-                    setForm((f) => ({ ...f, timePeriod: e.target.value }))
+                    setForm((f) => ({ ...f, periodStart: e.target.value }))
                   }
-                  placeholder="e.g. Daily, Hourly, Every 6 hours"
+                  placeholder="e.g. 18/03/2025, 00:00:00"
+                  className="admin-input"
+                />
+              </div>
+              <div className="admin-form-group">
+                <label>
+                  <MdSchedule size={16} style={{ verticalAlign: "middle", marginRight: 6 }} />
+                  Period End (Date & Time)
+                </label>
+                <input
+                  type="text"
+                  value={form.periodEnd}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, periodEnd: e.target.value }))
+                  }
+                  placeholder="e.g. 18/03/2025, 23:59:59"
                   className="admin-input"
                 />
               </div>

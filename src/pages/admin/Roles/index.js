@@ -10,7 +10,7 @@ const PERMISSION_SECTIONS = [
   { title: "Incidents Management", paths: ["/incidents-percent", "/incidents-recurring", "/incident-management", "/incidents-auto-assignment"] },
   { title: "Performance Monitoring", paths: ["/process-monitor/thanksgiving", "/process-monitor/thanksgiving/configuration", "/system-monitoring", "/system-monitoring/sap-system"] },
   { title: "Resource Effectiveness", paths: ["/resource-queue-length", "/resource-incidents-resolved", "/resource-time-per-resolution"] },
-  { title: "Troubleshooting Assistance", paths: ["/kedb", "/web-suggested-actions"] },
+  { title: "Troubleshooting Assistance", paths: ["/kedb", "/suggested-actions-depository", "/web-suggested-actions"] },
   { title: "Value Creation", paths: ["/preventive-measures", "/self-service-actions"] },
   { title: "Potential Automation", paths: ["/automation-target-areas", "/automation-preventive-alerts"] },
   { title: "Effectiveness of Measures", paths: ["/effectiveness-occurrence", "/effectiveness-resolution-time"] },

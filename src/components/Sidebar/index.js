@@ -212,8 +212,8 @@ export default function Sidebar() {
                   </li>
                 )}
 
-                {/* Performance Monitoring Section */}
-                {(canShow("/process-monitor/thanksgiving") || canShow("/system-monitoring")) && (
+                {/* Performance Monitoring Section - three items, no children */}
+                {(canShow("/process-monitor/thanksgiving/configuration") || canShow("/process-monitor/thanksgiving") || canShow("/system-monitoring")) && (
                   <li className="sidebar-section">
                     <div
                       className="section-header"
@@ -233,40 +233,20 @@ export default function Sidebar() {
                     </div>
                     {expandedSections.batchPerformance && (
                       <ul className="subsection-list">
+                        {canShow("/process-monitor/thanksgiving/configuration") && (
+                          <li className={`sidebar-item subsection ${location.pathname === "/process-monitor/thanksgiving/configuration" ? "active" : ""}`}>
+                            <Link to="/process-monitor/thanksgiving/configuration" className="sidebar-link">
+                              <MdBuild size={14} className="link-icon" />
+                              <span className="link-text">Configuration</span>
+                            </Link>
+                          </li>
+                        )}
                         {canShow("/process-monitor/thanksgiving") && (
-                          <li className="sidebar-section">
-                            <div
-                              className="section-header"
-                              onClick={() => toggleSection("backgroundJobMonitoring")}
-                              role="button"
-                              tabIndex={0}
-                            >
-                              <div className="header-content">
-                                <MdSpeed size={14} className="section-icon" />
-                                <span className="section-title">Background Job Monitoring</span>
-                              </div>
-                              {expandedSections.backgroundJobMonitoring ? (
-                                <RiArrowDownSLine size={14} className="chevron-icon" />
-                              ) : (
-                                <RiArrowRightSLine size={14} className="chevron-icon" />
-                              )}
-                            </div>
-                            {expandedSections.backgroundJobMonitoring && (
-                              <ul className="subsection-list nested">
-                                <li className={`sidebar-item subsection ${location.pathname === "/process-monitor/thanksgiving/configuration" ? "active" : ""}`}>
-                                  <Link to="/process-monitor/thanksgiving/configuration" className="sidebar-link">
-                                    <MdBuild size={14} className="link-icon" />
-                                    <span className="link-text">Configuration</span>
-                                  </Link>
-                                </li>
-                                <li className={`sidebar-item subsection ${location.pathname === "/process-monitor/thanksgiving" ? "active" : ""}`}>
-                                  <Link to="/process-monitor/thanksgiving" className="sidebar-link">
-                                    <MdVisibility size={14} className="link-icon" />
-                                    <span className="link-text">Monitoring</span>
-                                  </Link>
-                                </li>
-                              </ul>
-                            )}
+                          <li className={`sidebar-item subsection ${location.pathname === "/process-monitor/thanksgiving" ? "active" : ""}`}>
+                            <Link to="/process-monitor/thanksgiving" className="sidebar-link">
+                              <MdSpeed size={14} className="link-icon" />
+                              <span className="link-text">Background Job Monitoring</span>
+                            </Link>
                           </li>
                         )}
                         {canShow("/system-monitoring") && (
@@ -333,7 +313,7 @@ export default function Sidebar() {
                 )}
 
                 {/* Troubleshooting Assistance Section - visible for limited users (kedb + web-suggested-actions) */}
-                {(canShow("/kedb") || canShow("/web-suggested-actions")) && (
+                {(canShow("/kedb") || canShow("/web-suggested-actions") || canShow("/suggested-actions-depository")) && (
                   <li className="sidebar-section">
                     <div
                       className="section-header"
@@ -358,6 +338,14 @@ export default function Sidebar() {
                             <Link to="/kedb" className="sidebar-link">
                               <MdLightbulb size={14} className="link-icon" />
                               <span className="link-text">Suggested Actions - Knowledge Bank</span>
+                            </Link>
+                          </li>
+                        )}
+                        {canShow("/suggested-actions-depository") && (
+                          <li className={`sidebar-item subsection ${location.pathname === "/suggested-actions-depository" ? "active" : ""}`}>
+                            <Link to="/suggested-actions-depository" className="sidebar-link">
+                              <MdStorage size={14} className="link-icon" />
+                              <span className="link-text">Suggested Actions - Depository</span>
                             </Link>
                           </li>
                         )}

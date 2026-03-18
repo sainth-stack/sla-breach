@@ -52,6 +52,7 @@ function App() {
             <Route path="/resource-time-per-resolution" element={<ComingSoon />} />
 
             {/* Troubleshooting Assistance Section */}
+            <Route path="/suggested-actions-depository" element={<ComingSoon />} />
             <Route path="/web-suggested-actions" element={<WebSuggestedActions />} />
 
             {/* Value Creation Section */}

@@ -2,3 +2,12 @@
 .job-config-page .admin-page-container {
   padding: 32px;
 }
+
+/* Period: one header "Time Period" with two sub-columns */
+.job-config-period-subhead th {
+  font-weight: 500;
+  font-size: 0.875em;
+  color: #64748b;
+  border-top: none;
+  padding-top: 0;
+}

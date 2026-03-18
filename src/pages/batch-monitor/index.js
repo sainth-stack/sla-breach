@@ -72,7 +72,8 @@ const DATA_COLUMNS = [
 
 const formatCell = (row, col) => {
   const val = row[col.key];
-  if (val == null) return '—';
+  if (val == null && col.key !== '_avgRunTime') return '—';
+  if (col.key === '_avgRunTime') return typeof row._avgRunTime === 'number' ? row._avgRunTime.toFixed(2) : '—';
   if (col.format === 'odataDate') {
     const ms = parseODataDate(val);
     return ms != null ? new Date(ms).toLocaleString() : String(val);
@@ -181,6 +182,7 @@ const BackgroundJobMonitoring = () => {
       return {
         ...row,
         _runtime: runtime,
+        _avgRunTime: fifteenDayAvg,
         _avgRuntimeDaily: dailyAvg,
         _avgRuntime15Day: fifteenDayAvg,
         _standardDeviation: standardDeviation,
@@ -190,7 +192,27 @@ const BackgroundJobMonitoring = () => {
     });
   }, [filteredData, dailyAvg, fifteenDayAvg, standardDeviation, toleranceSeconds]);
 
-  const tableColumns = DATA_COLUMNS;
+  const columnOrder = useMemo(() => {
+    const base = [...DATA_COLUMNS];
+    const rtIdx = base.findIndex((c) => c.key === 'RunTimeSeconds');
+    const avgCol = { key: '_avgRunTime', label: 'Avg Run Time (s)' };
+    if (rtIdx >= 0) {
+      const out = [...base];
+      out.splice(rtIdx + 1, 0, avgCol);
+      return out;
+    }
+    return [...base, avgCol];
+  }, []);
+
+  const allTableColumns = useMemo(
+    () => columnOrder.concat([
+      { key: '_avgRuntimeDaily', label: 'Avg Runtime (Daily)' },
+      { key: '_avgRuntime15Day', label: 'Avg Runtime (15-day)' },
+      { key: '_standardDeviation', label: 'Standard Deviation' },
+      { key: '_tolerance', label: 'Tolerance' },
+    ]),
+    [columnOrder]
+  );
 
   return (
     <div className="batch-monitor-page">
@@ -236,32 +258,34 @@ const BackgroundJobMonitoring = () => {
             <table className="job-monitor-table">
               <thead>
                 <tr>
-                  {tableColumns.map((col) => (
+                  {allTableColumns.map((col) => (
                     <th key={col.key}>{col.label}</th>
                   ))}
-                  <th>Avg Runtime (Daily)</th>
-                  <th>Avg Runtime (15-day)</th>
-                  <th>Standard Deviation</th>
-                  <th>Tolerance</th>
                 </tr>
               </thead>
               <tbody>
                 {rowsWithStats.length === 0 ? (
                   <tr>
-                    <td colSpan={tableColumns.length + 4} className="empty-cell">
+                    <td colSpan={allTableColumns.length} className="empty-cell">
                       No data
                     </td>
                   </tr>
                 ) : (
                   rowsWithStats.map((row, idx) => (
                     <tr key={idx} className={row._exceedsTolerance ? 'row-exceeds' : ''}>
-                      {tableColumns.map((col) => (
-                        <td key={col.key}>{formatCell(row, col)}</td>
+                      {allTableColumns.map((col) => (
+                        <td key={col.key}>
+                          {col.key === '_avgRuntimeDaily'
+                            ? row._avgRuntimeDaily.toFixed(2) + 's'
+                            : col.key === '_avgRuntime15Day'
+                            ? row._avgRuntime15Day.toFixed(2) + 's'
+                            : col.key === '_standardDeviation'
+                            ? row._standardDeviation.toFixed(2) + 's'
+                            : col.key === '_tolerance'
+                            ? row._tolerance.toFixed(2) + 's'
+                            : formatCell(row, col)}
+                        </td>
                       ))}
-                      <td>{row._avgRuntimeDaily.toFixed(2)}s</td>
-                      <td>{row._avgRuntime15Day.toFixed(2)}s</td>
-                      <td>{row._standardDeviation.toFixed(2)}s</td>
-                      <td>{row._tolerance.toFixed(2)}s</td>
                     </tr>
                   ))
                 )}

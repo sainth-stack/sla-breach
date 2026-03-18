@@ -162,6 +162,8 @@ const SelfServiceActions = () => {
         { id: 's4', title: 'S/4HANA', desc: 'Query Sales Orders, Purchase Orders and more.', logo: s4Logo, available: true, badge: 'Live' },
         { id: 'btp', title: 'SAP ECC', desc: 'Self Service for SAP ECC system.', logo: eccLogo, available: false, badge: 'Soon' },
         { id: 'batch', title: 'SAP S/4 Cloud', desc: 'Self Service for SAP S/4 Cloud system.', logo: s4CloudLogo, available: false, badge: 'Soon' },
+        { id: 'sop-know-errors', title: 'SOP - Know Errors', desc: 'Standard operating procedures and known errors.', logo: null, available: false, badge: 'Coming Soon' },
+        { id: 'nlp-analysis', title: 'NLP Analysis', desc: 'Natural language processing insights.', logo: null, available: false, badge: 'Coming Soon' },
     ];
 
     return (
@@ -176,7 +178,7 @@ const SelfServiceActions = () => {
                         className={`ssa-card ${card.available ? 'active' : 'inactive'}`}
                         onClick={() => card.available && setBotOpen(true)}
                     >
-                        <span className={`ssa-card-badge ${card.available ? 'live' : 'soon'}`}>{card.badge}</span>
+                        <span className={`ssa-card-badge ${card.available ? 'live' : 'soon'}`}>{card.badge || 'Soon'}</span>
                         <div className="ssa-card-logo">
                             {card.logo
                                 ? <img src={card.logo} alt={card.title} />
