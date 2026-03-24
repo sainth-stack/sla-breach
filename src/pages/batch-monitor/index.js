@@ -89,7 +89,7 @@ function getJobMonitorRefreshTimes() {
     const loginTime = user?.loginTime;
     if (!loginTime) return { lastRefreshed: null, nextRefresh: null };
     const last = new Date(loginTime);
-    const next = new Date(last.getTime() + 60 * 60 * 1000);
+    const next = new Date(last.getTime() + 10 * 60 * 1000);
     return { lastRefreshed: last, nextRefresh: next };
   } catch {
     return { lastRefreshed: null, nextRefresh: null };

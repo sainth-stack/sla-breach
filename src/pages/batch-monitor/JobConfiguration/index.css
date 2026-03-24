@@ -24,3 +24,81 @@
 .job-config-period-cell {
   text-align: center;
 }
+
+/* Application configuration block (aligned with Job Configuration layout) */
+.job-config-app-section {
+  margin-top: 48px;
+  padding-top: 32px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.job-config-app-status-stopped {
+  color: #dc2626;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+/* Ant Design modals & forms — SaaS polish */
+.job-config-modal .ant-modal-header {
+  margin-bottom: 8px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.job-config-modal .ant-modal-title {
+  margin: 0;
+}
+
+.job-config-modal-title {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.job-config-modal-heading {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+}
+
+.job-config-modal-subtitle {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  line-height: 1.45;
+  max-width: 100%;
+}
+
+.job-config-form.ant-form-vertical .ant-form-item {
+  margin-bottom: 20px;
+}
+
+.job-config-form.ant-form-vertical .ant-form-item-label > label {
+  font-weight: 600;
+  color: #334155;
+}
+
+.job-config-form .ant-form-item-extra {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 6px;
+}
+
+.job-config-form-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+  padding-top: 20px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.job-config-form-footer .ant-btn-primary {
+  min-width: 120px;
+  font-weight: 600;
+}
+
+.job-config-select-dropdown .ant-select-item-option-selected {
+  font-weight: 600;
+}
