@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import ChatBot from '../../components/ChatBot';
+import { sendAppLog } from '../../utils/logger';
 import './index.css';
 
 const KEDB = () => {
@@ -21,6 +22,14 @@ const KEDB = () => {
       setHasUploadedFile(false);
     }
     setIsLoading(false);
+  }, []);
+
+  useEffect(() => {
+    sendAppLog({
+      pathname: window.location.pathname,
+      logType: 'KEDB Page Opened',
+      content: 'KEDB page opened'
+    });
   }, []);
 
   if (isLoading) {
@@ -91,6 +100,7 @@ const KEDB = () => {
       className="kedb-chatbot"
       maxWidth="1400px"
       isKnowledgeBase={true}
+      onApiStatusLog={sendAppLog}
     />
   );
 };

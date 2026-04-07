@@ -16,7 +16,8 @@ const ChatBot = ({
   showSessionInfo = true,
   className = "",
   maxWidth = "1200px",
-  isKnowledgeBase = false
+  isKnowledgeBase = false,
+  onApiStatusLog = null
 }) => {
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -107,6 +108,14 @@ const ChatBot = ({
       data = await response.json();
       console.log('Backend response:', data);
 
+      if (isKnowledgeBase && typeof onApiStatusLog === 'function') {
+        onApiStatusLog({
+          pathname: window.location.pathname,
+          logType: 'S',
+          content: 'KEDB query API success'
+        });
+      }
+
       if (isKnowledgeBase) {
         // Expect SAP-style response: { request, response, metadata? }
         const responseText = typeof data?.response === 'string' ? data.response : (typeof data?.payload === 'string' ? data.payload : '');
@@ -152,6 +161,14 @@ const ChatBot = ({
       }
     } catch (error) {
       console.error('Error:', error);
+
+      if (isKnowledgeBase && typeof onApiStatusLog === 'function') {
+        onApiStatusLog({
+          pathname: window.location.pathname,
+          logType: 'E',
+          content: `KEDB query API failed: ${error.message || 'Unknown error'}`
+        });
+      }
       
       setMessages(prev => prev.filter(msg => !msg.isLoading).concat([{ 
         type: 'bot', 
