@@ -12,7 +12,7 @@ const ReportViewer = ({ rawData, headerIndices }) => {
     creationDateTo: null,
     priority: [], // Changed to array
     assignedTo: [], // Already array
-    status: [], // Changed to array
+    status: ['Work in progress'], // Default to "Work in progress"
     breached: [], // Changed to array
     marconaName: [], // Changed to array
     searchText: '',
@@ -181,7 +181,7 @@ const ReportViewer = ({ rawData, headerIndices }) => {
       creationDateTo: null,
       priority: [],
       assignedTo: [],
-      status: [],
+      status: ['Work in progress'], // Reset to default "Work in progress"
       breached: [],
       marconaName: [],
       searchText: '',

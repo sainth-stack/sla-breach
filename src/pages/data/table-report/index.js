@@ -1,10 +1,13 @@
 import React, { useState, useMemo } from 'react';
 import SharedFilters from '../filter/sharedReport';
+import SearchModal from '../../../components/SearchModal';
 
 const TableReport = ({ data, filters, onFilterChange, onResetFilters, getUniqueValues }) => {
   console.log(filters)
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [currentPage, setCurrentPage] = useState(1);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedTicket, setSelectedTicket] = useState(null);
   const itemsPerPage = 10;
   const columns = [
     { key: 'ticketId', name: 'Ticket ID' },
@@ -12,6 +15,8 @@ const TableReport = ({ data, filters, onFilterChange, onResetFilters, getUniqueV
     { key: 'priority', name: 'Priority' },
     { key: 'assignedTo', name: 'Assigned To' },
     { key: 'marconaName', name: 'Macro Area - Name' },
+    { key: 'similaritySearch', name: 'Similarity Search' },
+    { key: 'webSearch', name: 'Web Search' },
     { key: 'currentStatus', name: 'Current Status' },
     { key: 'totalTime', name: 'Resolution SLA Time' },
     { key: 'elapsedTime', name: 'Elapsed Time (h)' },
@@ -69,13 +74,20 @@ const TableReport = ({ data, filters, onFilterChange, onResetFilters, getUniqueV
     return 'badge-open';
   };
 
-  return (
-    <div className="report-card">
-      <div className="report-header">
-        {/* <h1 className="report-title">SLA Monitoring</h1> */}
-      </div>
+  // Handle search modal open
+  const handleSearchClick = (ticket, searchType) => {
+    setSelectedTicket({ ...ticket, searchType });
+    setIsModalOpen(true);
+  };
 
-      <SharedFilters 
+  return (
+    <>
+      <div className="report-card">
+        <div className="report-header">
+          {/* <h1 className="report-title">SLA Monitoring</h1> */}
+        </div>
+
+        <SharedFilters 
         filters={filters}
         onFilterChange={onFilterChange}
         onResetFilters={onResetFilters}
@@ -98,7 +110,15 @@ const TableReport = ({ data, filters, onFilterChange, onResetFilters, getUniqueV
           <thead>
             <tr>
               {columns.map((column) => (
-                <th key={column.key} onClick={() => requestSort(column.key)}>
+                <th 
+                  key={column.key} 
+                  onClick={() => {
+                    if (column.key !== 'similaritySearch' && column.key !== 'webSearch') {
+                      requestSort(column.key);
+                    }
+                  }}
+                  style={{ cursor: column.key !== 'similaritySearch' && column.key !== 'webSearch' ? 'pointer' : 'default' }}
+                >
                   <div className="flex items-center">
                     {column.name}
                     {sortConfig.key === column.key && (
@@ -125,6 +145,24 @@ const TableReport = ({ data, filters, onFilterChange, onResetFilters, getUniqueV
                 </td>
                 <td>{ticket.assignedTo}</td>
                 <td>{ticket.marconaName}</td>
+                <td>
+                  <button
+                    onClick={() => handleSearchClick(ticket, 'similarity')}
+                    className="text-blue-600 hover:text-blue-800 hover:underline font-medium cursor-pointer bg-transparent border-none"
+                    style={{ padding: 0 }}
+                  >
+                    Click here
+                  </button>
+                </td>
+                <td>
+                  <button
+                    onClick={() => handleSearchClick(ticket, 'webSearch')}
+                    className="text-blue-600 hover:text-blue-800 hover:underline font-medium cursor-pointer bg-transparent border-none"
+                    style={{ padding: 0 }}
+                  >
+                    Click here
+                  </button>
+                </td>
                 <td>
                   <span className={`badge ${getBadgeClass(ticket.currentStatus)}`}>
                     {ticket.currentStatus}
@@ -208,7 +246,22 @@ const TableReport = ({ data, filters, onFilterChange, onResetFilters, getUniqueV
           </button>
         </div>
       )}
-    </div>
+      </div>
+
+      {/* Search Modal */}
+      {selectedTicket && (
+        <SearchModal
+          isOpen={isModalOpen}
+          onClose={() => {
+            setIsModalOpen(false);
+            setSelectedTicket(null);
+          }}
+          description={selectedTicket.marconaName || ''}
+          ticketId={selectedTicket.ticketId}
+          searchType={selectedTicket.searchType}
+        />
+      )}
+    </>
   );
 };
 
