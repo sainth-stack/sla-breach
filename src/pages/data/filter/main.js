@@ -1,11 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import TableReport from '../table-report/index';
-import PiechartReport from '../piechart/piechart-report';
-import '../piechart/PiechartReport.css';
 import '../table-report/TableReport.css'
 
 const ReportViewer = ({ rawData, headerIndices }) => {
-  const [activeView, setActiveView] = useState('table');
   const [filters, setFilters] = useState({
     requestType: [], // Added Request Type filter
     creationDateFrom: null,
@@ -192,38 +189,13 @@ const ReportViewer = ({ rawData, headerIndices }) => {
 
   return (
     <div className="combined-report-container">
-      <div className="view-switcher">
-        <button
-          className={`view-button ${activeView === 'table' ? 'active' : ''}`}
-          onClick={() => setActiveView('table')}
-        >
-          Table View
-        </button>
-        <button
-          className={`view-button ${activeView === 'charts' ? 'active' : ''}`}
-          onClick={() => setActiveView('charts')}
-        >
-          Analytics View
-        </button>
-      </div>
-
-      {activeView === 'table' ? (
-        <TableReport 
-          data={filteredData}
-          filters={filters}
-          onFilterChange={handleFilterChange}
-          onResetFilters={resetFilters}
-          getUniqueValues={getUniqueValues}
-        />
-      ) : (
-        <PiechartReport 
-          data={filteredData}
-          filters={filters}
-          onFilterChange={handleFilterChange}
-          onResetFilters={resetFilters}
-          getUniqueValues={getUniqueValues}
-        />
-      )}
+      <TableReport 
+        data={filteredData}
+        filters={filters}
+        onFilterChange={handleFilterChange}
+        onResetFilters={resetFilters}
+        getUniqueValues={getUniqueValues}
+      />
     </div>
   );
 };

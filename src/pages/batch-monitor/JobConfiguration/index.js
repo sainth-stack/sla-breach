@@ -13,7 +13,11 @@ import {
 } from "antd";
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
-import { systemMonitoringHistoryURL } from "../../../const";
+import {
+  configurationJobsURL,
+  configurationApplicationsURL,
+  configurationGlobalIntervalsURL,
+} from "../../../const";
 import "../../admin/common.css";
 import "./index.css";
 
@@ -38,20 +42,6 @@ const parseJobDate = (str) => {
 const formatJobDate = (v) =>
   dayjs.isDayjs(v) && v.isValid() ? v.format(DATE_FMT) : String(v || "");
 
-/** Default: one record - job name, system S4 Hana, period start/end date and time */
-const defaultPeriodStart = () => formatJobDate(defaultPeriodStartDayjs());
-const defaultPeriodEnd = () => formatJobDate(defaultPeriodEndDayjs());
-
-const INITIAL_JOBS = [
-  {
-    id: 1,
-    jobName: "/1DH/CDC_HEALTH_CHECK",
-    system: "S4 Hana",
-    periodStart: defaultPeriodStart(),
-    periodEnd: defaultPeriodEnd(),
-  },
-];
-
 const APP_STATUS_OPTIONS = [
   { value: "RUNNING", label: "Running" },
   { value: "STOPPED", label: "Stopped" },
@@ -60,7 +50,9 @@ const APP_STATUS_OPTIONS = [
 ];
 
 const JobConfiguration = () => {
-  const [jobs, setJobs] = useState(INITIAL_JOBS);
+  const [jobs, setJobs] = useState([]);
+  const [jobsLoading, setJobsLoading] = useState(true);
+  const [jobsError, setJobsError] = useState(null);
   const [applications, setApplications] = useState([]);
   const [appConfigLoading, setAppConfigLoading] = useState(true);
   const [appConfigError, setAppConfigError] = useState(null);
@@ -70,6 +62,11 @@ const JobConfiguration = () => {
   const [appModalOpen, setAppModalOpen] = useState(false);
   const [appEditingId, setAppEditingId] = useState(null);
   const [appSubmitting, setAppSubmitting] = useState(false);
+  const [jobIntervalCommon, setJobIntervalCommon] = useState("");
+  const [appIntervalCommon, setAppIntervalCommon] = useState("");
+  const [globalIntervalsLoading, setGlobalIntervalsLoading] = useState(true);
+  const [savingJobInterval, setSavingJobInterval] = useState(false);
+  const [savingAppInterval, setSavingAppInterval] = useState(false);
 
   const [jobForm] = Form.useForm();
   const [applicationForm] = Form.useForm();
@@ -141,6 +138,31 @@ const JobConfiguration = () => {
     setJobModalOpen(true);
   };
 
+  const fetchJobs = useCallback(async () => {
+    try {
+      setJobsLoading(true);
+      setJobsError(null);
+      const res = await fetch(configurationJobsURL);
+      if (!res.ok) throw new Error("Failed to load job configuration");
+      const data = await res.json();
+      const rows = Array.isArray(data) ? data : [];
+      setJobs(
+        rows.map((row) => ({
+          id: row.id,
+          jobName: row.job_name ?? "",
+          system: row.system ?? "",
+          periodStart: row.period_start ?? "",
+          periodEnd: row.period_end ?? "",
+        }))
+      );
+    } catch (err) {
+      setJobsError(err.message || "Failed to load job configuration");
+      setJobs([]);
+    } finally {
+      setJobsLoading(false);
+    }
+  }, []);
+
   const onJobSubmit = async (values) => {
     setJobSubmitting(true);
     try {
@@ -150,47 +172,68 @@ const JobConfiguration = () => {
         message.error("Period end cannot be before period start.");
         return;
       }
-      const payload = {
-        jobName: values.jobName.trim(),
+      const body = JSON.stringify({
+        job_name: values.jobName.trim(),
         system: values.system.trim(),
-        periodStart: formatJobDate(values.periodStart),
-        periodEnd: formatJobDate(values.periodEnd),
-      };
-      if (jobEditingId != null) {
-        setJobs((prev) =>
-          prev.map((j) =>
-            j.id === jobEditingId ? { ...j, ...payload } : j
-          )
-        );
-        message.success("Job configuration updated.");
-      } else {
-        const nextId = Math.max(0, ...jobs.map((j) => j.id)) + 1;
-        setJobs((prev) => [...prev, { id: nextId, ...payload }]);
-        message.success("Job configuration created.");
+        period_start: formatJobDate(values.periodStart),
+        period_end: formatJobDate(values.periodEnd),
+      });
+      const url =
+        jobEditingId != null
+          ? `${configurationJobsURL}/${jobEditingId}`
+          : configurationJobsURL;
+      const method = jobEditingId != null ? "PUT" : "POST";
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body,
+      });
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.detail || res.statusText || "Request failed");
       }
+      message.success(
+        jobEditingId != null
+          ? "Job configuration updated."
+          : "Job configuration created."
+      );
       setJobModalOpen(false);
       jobForm.resetFields();
+      await fetchJobs();
+    } catch (e) {
+      message.error(e.message || "Could not save job configuration");
     } finally {
       setJobSubmitting(false);
     }
   };
 
-  const removeJob = (id) => {
-    setJobs((prev) => prev.filter((j) => j.id !== id));
-    message.success("Job configuration deleted.");
+  const removeJob = async (id) => {
+    try {
+      const res = await fetch(`${configurationJobsURL}/${id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok && res.status !== 204) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.detail || "Delete failed");
+      }
+      message.success("Job configuration deleted.");
+      await fetchJobs();
+    } catch (e) {
+      message.error(e.message || "Could not delete job");
+    }
   };
 
   const fetchApplicationConfig = useCallback(async () => {
     try {
       setAppConfigLoading(true);
       setAppConfigError(null);
-      const res = await fetch(systemMonitoringHistoryURL);
+      const res = await fetch(configurationApplicationsURL);
       if (!res.ok) throw new Error("Failed to load application configuration");
       const data = await res.json();
       const rows = Array.isArray(data) ? data : [];
       setApplications(
-        rows.map((row, idx) => ({
-          id: idx + 1,
+        rows.map((row) => ({
+          id: row.id,
           app_name: row.app_name ?? "",
           status: row.status ?? "",
           details: row.details ?? "",
@@ -217,41 +260,123 @@ const JobConfiguration = () => {
   const onApplicationSubmit = async (values) => {
     setAppSubmitting(true);
     try {
-      const payload = {
+      const body = JSON.stringify({
         app_name: values.appName.trim(),
         status: (values.status || "").trim(),
         details: (values.details || "").trim(),
-      };
-      if (appEditingId != null) {
-        setApplications((prev) =>
-          prev.map((a) =>
-            a.id === appEditingId ? { ...a, ...payload } : a
-          )
-        );
-        message.success("Application updated.");
-      } else {
-        const nextId =
-          applications.length === 0
-            ? 1
-            : Math.max(...applications.map((a) => a.id)) + 1;
-        setApplications((prev) => [...prev, { id: nextId, ...payload }]);
-        message.success("Application added.");
+      });
+      const url =
+        appEditingId != null
+          ? `${configurationApplicationsURL}/${appEditingId}`
+          : configurationApplicationsURL;
+      const method = appEditingId != null ? "PUT" : "POST";
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body,
+      });
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.detail || res.statusText || "Request failed");
       }
+      message.success(
+        appEditingId != null ? "Application updated." : "Application added."
+      );
       setAppModalOpen(false);
       applicationForm.resetFields();
+      await fetchApplicationConfig();
+    } catch (e) {
+      message.error(e.message || "Could not save application");
     } finally {
       setAppSubmitting(false);
     }
   };
 
-  const removeApplication = (id) => {
-    setApplications((prev) => prev.filter((a) => a.id !== id));
-    message.success("Application deleted.");
+  const removeApplication = async (id) => {
+    try {
+      const res = await fetch(`${configurationApplicationsURL}/${id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok && res.status !== 204) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.detail || "Delete failed");
+      }
+      message.success("Application deleted.");
+      await fetchApplicationConfig();
+    } catch (e) {
+      message.error(e.message || "Could not delete application");
+    }
   };
+
+  const fetchGlobalIntervals = useCallback(async () => {
+    try {
+      setGlobalIntervalsLoading(true);
+      const res = await fetch(configurationGlobalIntervalsURL);
+      if (!res.ok) throw new Error("Failed to load interval settings");
+      const data = await res.json();
+      setJobIntervalCommon(data.job_interval_time ?? "");
+      setAppIntervalCommon(data.application_interval_time ?? "");
+    } catch {
+      setJobIntervalCommon("");
+      setAppIntervalCommon("");
+    } finally {
+      setGlobalIntervalsLoading(false);
+    }
+  }, []);
+
+  const persistGlobalIntervals = async (nextJob, nextApp) => {
+    const res = await fetch(configurationGlobalIntervalsURL, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        job_interval_time: (nextJob ?? "").trim(),
+        application_interval_time: (nextApp ?? "").trim(),
+      }),
+    });
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => ({}));
+      throw new Error(errJson.detail || res.statusText || "Save failed");
+    }
+    const data = await res.json();
+    setJobIntervalCommon(data.job_interval_time ?? "");
+    setAppIntervalCommon(data.application_interval_time ?? "");
+  };
+
+  const saveJobSectionInterval = async () => {
+    setSavingJobInterval(true);
+    try {
+      await persistGlobalIntervals(jobIntervalCommon, appIntervalCommon);
+      message.success("Interval time saved for job monitoring.");
+    } catch (e) {
+      message.error(e.message || "Could not save interval time");
+    } finally {
+      setSavingJobInterval(false);
+    }
+  };
+
+  const saveAppSectionInterval = async () => {
+    setSavingAppInterval(true);
+    try {
+      await persistGlobalIntervals(jobIntervalCommon, appIntervalCommon);
+      message.success("Interval time saved for application monitoring.");
+    } catch (e) {
+      message.error(e.message || "Could not save interval time");
+    } finally {
+      setSavingAppInterval(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchJobs();
+  }, [fetchJobs]);
 
   useEffect(() => {
     fetchApplicationConfig();
   }, [fetchApplicationConfig]);
+
+  useEffect(() => {
+    fetchGlobalIntervals();
+  }, [fetchGlobalIntervals]);
 
   return (
     <div className="admin-page-container job-config-page">
@@ -259,8 +384,31 @@ const JobConfiguration = () => {
         <div className="header-section">
           <h1 className="page-title">Job Configuration</h1>
           <p className="page-subtitle">
-            Configure background jobs: Job Name, System, and Time Period (Start & End)
+            Configure background jobs: Job Name, System, and Time Period (Start & End). Interval time below applies to all jobs in this section.
           </p>
+        </div>
+
+        <div className="job-config-section-interval">
+          <label className="job-config-section-interval-label" htmlFor="job-interval-common">
+            Interval time
+          </label>
+          <Input
+            id="job-interval-common"
+            allowClear
+            placeholder="e.g. 15m, 1h — shared for all jobs"
+            value={jobIntervalCommon}
+            onChange={(e) => setJobIntervalCommon(e.target.value)}
+            disabled={globalIntervalsLoading}
+            className="job-config-section-interval-input"
+          />
+          <Button
+            type="primary"
+            loading={savingJobInterval}
+            disabled={globalIntervalsLoading}
+            onClick={saveJobSectionInterval}
+          >
+            Save
+          </Button>
         </div>
 
         <div className="admin-toolbar">
@@ -287,7 +435,19 @@ const JobConfiguration = () => {
               </tr>
             </thead>
             <tbody>
-              {jobs.length === 0 ? (
+              {jobsLoading ? (
+                <tr>
+                  <td colSpan={5} className="admin-empty">
+                    Loading job configuration…
+                  </td>
+                </tr>
+              ) : jobsError ? (
+                <tr>
+                  <td colSpan={5} className="admin-empty">
+                    {jobsError}
+                  </td>
+                </tr>
+              ) : jobs.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="admin-empty">
                     No jobs configured. Add a job to get started.
@@ -332,8 +492,31 @@ const JobConfiguration = () => {
           <div className="header-section">
             <h2 className="page-title">Application configuration</h2>
             <p className="page-subtitle">
-              Monitor and manage applications: name, status, and notification details (same data as System Monitoring)
+              Monitor and manage applications: name, status, and notification details. Interval time below applies to all applications in this section.
             </p>
+          </div>
+
+          <div className="job-config-section-interval">
+            <label className="job-config-section-interval-label" htmlFor="app-interval-common">
+              Interval time
+            </label>
+            <Input
+              id="app-interval-common"
+              allowClear
+              placeholder="e.g. 5m — shared for all applications"
+              value={appIntervalCommon}
+              onChange={(e) => setAppIntervalCommon(e.target.value)}
+              disabled={globalIntervalsLoading}
+              className="job-config-section-interval-input"
+            />
+            <Button
+              type="primary"
+              loading={savingAppInterval}
+              disabled={globalIntervalsLoading}
+              onClick={saveAppSectionInterval}
+            >
+              Save
+            </Button>
           </div>
 
           <div className="admin-toolbar">
@@ -372,7 +555,7 @@ const JobConfiguration = () => {
                 ) : applications.length === 0 ? (
                   <tr>
                     <td colSpan={4} className="admin-empty">
-                      No applications configured. Add an application or refresh after the feed loads.
+                      No applications configured. Add an application to get started.
                     </td>
                   </tr>
                 ) : (

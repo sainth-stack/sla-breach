@@ -7,7 +7,8 @@
  */
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import axios from 'axios';
-import { backgroundJobMonitorBaseURL } from '../../const';
+import { backgroundJobMonitorBaseURL, configurationJobsURL, configurationGlobalIntervalsURL } from '../../const';
+import { parseIntervalToMs } from '../../utils/parseIntervalTime';
 import './index.css';
 
 /** Job/entity set options for selector; API path is /jobs/{value} */
@@ -81,20 +82,7 @@ const formatCell = (row, col) => {
   return String(val);
 };
 
-/** Get login time from stored user (set on login); used for last refreshed / next refresh */
-function getJobMonitorRefreshTimes() {
-  try {
-    const raw = localStorage.getItem('user');
-    const user = raw ? JSON.parse(raw) : null;
-    const loginTime = user?.loginTime;
-    if (!loginTime) return { lastRefreshed: null, nextRefresh: null };
-    const last = new Date(loginTime);
-    const next = new Date(last.getTime() + 10 * 60 * 1000);
-    return { lastRefreshed: last, nextRefresh: next };
-  } catch {
-    return { lastRefreshed: null, nextRefresh: null };
-  }
-}
+const DEFAULT_POLL_MS = 5 * 60 * 1000;
 
 const BackgroundJobMonitoring = () => {
   const [selectedJob, setSelectedJob] = useState(JOB_OPTIONS[0]?.value || 'Z_I_FA_JOBS');
@@ -102,14 +90,50 @@ const BackgroundJobMonitoring = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [jobNameFilter, setJobNameFilter] = useState('');
+  const [configuredJobNames, setConfiguredJobNames] = useState([]);
+  const [jobIntervalText, setJobIntervalText] = useState('');
+  const [lastRefreshed, setLastRefreshed] = useState(null);
+  const [nextRefresh, setNextRefresh] = useState(null);
+  const [configLoaded, setConfigLoaded] = useState(false);
 
-  const { lastRefreshed, nextRefresh } = useMemo(() => getJobMonitorRefreshTimes(), []);
+  const pollIntervalMs = useMemo(
+    () => parseIntervalToMs(jobIntervalText, DEFAULT_POLL_MS),
+    [jobIntervalText]
+  );
 
   const apiUrl = `${backgroundJobMonitorBaseURL}/jobs/${selectedJob}`;
 
-  const fetchData = useCallback(async () => {
+  const loadJobConfiguration = useCallback(async () => {
     try {
-      setLoading(true);
+      const [jobsRes, globalRes] = await Promise.all([
+        fetch(configurationJobsURL),
+        fetch(configurationGlobalIntervalsURL),
+      ]);
+      if (jobsRes.ok) {
+        const jobs = await jobsRes.json();
+        const names = (Array.isArray(jobs) ? jobs : [])
+          .map((j) => (j.job_name || '').trim())
+          .filter(Boolean);
+        setConfiguredJobNames(names);
+      }
+      if (globalRes.ok) {
+        const g = await globalRes.json();
+        setJobIntervalText(g.job_interval_time ?? '');
+      }
+    } catch {
+      /* keep defaults */
+    } finally {
+      setConfigLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadJobConfiguration();
+  }, [loadJobConfiguration]);
+
+  const fetchData = useCallback(async (showLoading = true) => {
+    try {
+      if (showLoading) setLoading(true);
       setError(null);
       const response = await axios.get(apiUrl);
       let list = response.data;
@@ -124,6 +148,9 @@ const BackgroundJobMonitoring = () => {
       } else {
         setData([]);
       }
+      const now = new Date();
+      setLastRefreshed(now);
+      setNextRefresh(new Date(now.getTime() + pollIntervalMs));
     } catch (err) {
       const res = err.response;
       const message = res?.data?.error?.message?.value
@@ -136,13 +163,13 @@ const BackgroundJobMonitoring = () => {
     } finally {
       setLoading(false);
     }
-  }, [apiUrl]);
+  }, [apiUrl, pollIntervalMs]);
 
   useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, 300000);
+    fetchData(true);
+    const interval = setInterval(() => fetchData(false), pollIntervalMs);
     return () => clearInterval(interval);
-  }, [fetchData]);
+  }, [fetchData, pollIntervalMs]);
 
   const runtimes = useMemo(
     () => data.map((row) => getRuntimeSeconds(row)).filter((n) => n > 0),
@@ -150,7 +177,7 @@ const BackgroundJobMonitoring = () => {
   );
 
   const dailyAvg = useMemo(() => {
-    if (!runtimes.length) return 5;
+    if (!runtimes.length) return null;
     const now = Date.now();
     const oneDayMs = 24 * 60 * 60 * 1000;
     const lastDay = data
@@ -165,20 +192,21 @@ const BackgroundJobMonitoring = () => {
   }, [data, runtimes]);
 
   const fifteenDayAvg = useMemo(() => {
-    if (!runtimes.length) return 5;
+    if (!runtimes.length) return null;
     return mean(runtimes);
   }, [runtimes]);
 
   const standardDeviation = useMemo(() => {
-    if (runtimes.length < 2) return 0.1;
+    if (runtimes.length < 2) return null;
     return stdDev(runtimes);
   }, [runtimes]);
 
   const toleranceSeconds = useMemo(() => {
+    if (standardDeviation == null || standardDeviation <= 0) return null;
     return Math.max(0.1, standardDeviation * 2);
   }, [standardDeviation]);
 
-  const uniqueJobNames = useMemo(() => {
+  const uniqueJobNamesFromApi = useMemo(() => {
     const set = new Set();
     data.forEach((row) => {
       const name = row.JobName ?? row.jobName ?? '';
@@ -187,15 +215,43 @@ const BackgroundJobMonitoring = () => {
     return Array.from(set).sort();
   }, [data]);
 
+  /** Dropdown: nothing until config API finishes; then configured names or names from feed */
+  const jobNameOptions = useMemo(() => {
+    if (!configLoaded) return [];
+    if (configuredJobNames.length > 0) return [...configuredJobNames].sort();
+    return uniqueJobNamesFromApi;
+  }, [configLoaded, configuredJobNames, uniqueJobNamesFromApi]);
+
+  useEffect(() => {
+    if (
+      jobNameFilter &&
+      configuredJobNames.length > 0 &&
+      !configuredJobNames.includes(jobNameFilter)
+    ) {
+      setJobNameFilter('');
+    }
+  }, [configuredJobNames, jobNameFilter]);
+
   const filteredData = useMemo(() => {
-    if (!jobNameFilter) return data;
-    return data.filter((row) => String(row.JobName ?? row.jobName ?? '') === jobNameFilter);
-  }, [data, jobNameFilter]);
+    const getName = (row) => String(row.JobName ?? row.jobName ?? '').trim();
+    let rows = data;
+    if (configLoaded && configuredJobNames.length > 0) {
+      const allow = new Set(configuredJobNames);
+      rows = rows.filter((row) => allow.has(getName(row)));
+    }
+    if (jobNameFilter) {
+      rows = rows.filter((row) => getName(row) === jobNameFilter);
+    }
+    return rows;
+  }, [data, configLoaded, configuredJobNames, jobNameFilter]);
 
   const rowsWithStats = useMemo(() => {
     return filteredData.map((row) => {
       const runtime = getRuntimeSeconds(row);
-      const exceedsTolerance = runtime > fifteenDayAvg + toleranceSeconds;
+      const exceedsTolerance =
+        fifteenDayAvg != null &&
+        toleranceSeconds != null &&
+        runtime > fifteenDayAvg + toleranceSeconds;
       return {
         ...row,
         _runtime: runtime,
@@ -244,25 +300,34 @@ const BackgroundJobMonitoring = () => {
               className="filter-select"
               value={jobNameFilter}
               onChange={(e) => setJobNameFilter(e.target.value)}
+              disabled={!configLoaded}
             >
-              <option value="">All job names</option>
-              {uniqueJobNames.map((name) => (
+              <option value="">
+                {!configLoaded
+                  ? 'Loading configuration…'
+                  : configuredJobNames.length > 0
+                    ? 'All configured jobs'
+                    : 'All job names'}
+              </option>
+              {jobNameOptions.map((name) => (
                 <option key={name} value={name}>
                   {name}
                 </option>
               ))}
             </select>
           </label>
-          <button className="filter-btn" onClick={fetchData}>
+          <button type="button" className="filter-btn" onClick={() => fetchData(true)}>
             Refresh
           </button>
         </div>
       </header>
 
-      <div className="job-monitor-status">
-        <span className="job-monitor-status-item">Last refreshed: {formatDateTime(lastRefreshed)}</span>
-        <span className="job-monitor-status-item">Next refresh: {formatDateTime(nextRefresh)}</span>
-      </div>
+      {lastRefreshed != null && (
+        <div className="job-monitor-status">
+          <span className="job-monitor-status-item">Last refreshed: {formatDateTime(lastRefreshed)}</span>
+          <span className="job-monitor-status-item">Next refresh: {formatDateTime(nextRefresh)}</span>
+        </div>
+      )}
 
       <div className="chart-container table-container">
         {loading ? (
@@ -273,7 +338,7 @@ const BackgroundJobMonitoring = () => {
         ) : error ? (
           <div className="error-container">
             <p className="error-message">{error}</p>
-            <button className="filter-btn" onClick={fetchData}>
+            <button type="button" className="filter-btn" onClick={() => fetchData(true)}>
               Retry
             </button>
           </div>
@@ -300,13 +365,21 @@ const BackgroundJobMonitoring = () => {
                       {allTableColumns.map((col) => (
                         <td key={col.key}>
                           {col.key === '_avgRuntimeDaily'
-                            ? row._avgRuntimeDaily.toFixed(2) + 's'
+                            ? row._avgRuntimeDaily != null
+                              ? row._avgRuntimeDaily.toFixed(2) + 's'
+                              : '—'
                             : col.key === '_avgRuntime15Day'
-                            ? row._avgRuntime15Day.toFixed(2) + 's'
+                            ? row._avgRuntime15Day != null
+                              ? row._avgRuntime15Day.toFixed(2) + 's'
+                              : '—'
                             : col.key === '_standardDeviation'
-                            ? row._standardDeviation.toFixed(2) + 's'
+                            ? row._standardDeviation != null
+                              ? row._standardDeviation.toFixed(2) + 's'
+                              : '—'
                             : col.key === '_tolerance'
-                            ? row._tolerance.toFixed(2) + 's'
+                            ? row._tolerance != null
+                              ? row._tolerance.toFixed(2) + 's'
+                              : '—'
                             : formatCell(row, col)}
                         </td>
                       ))}

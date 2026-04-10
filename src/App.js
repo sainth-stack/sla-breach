@@ -17,8 +17,6 @@ import WebSuggestedActions from "./pages/web-suggested-actions";
 import SelfServiceActions from "./pages/self-service-actions";
 import AdminRoles from "./pages/admin/Roles";
 import AdminUsers from "./pages/admin/Users";
-import AutomationTargetAreas from "./pages/automation-target-areas";
-
 function App() {
   return (
     <Router>
@@ -59,9 +57,11 @@ function App() {
             <Route path="/preventive-measures" element={<ComingSoon />} />
             <Route path="/self-service-actions" element={<SelfServiceActions />} />
 
-            {/* Potential Automation Section */}
-            <Route path="/automation-target-areas" element={<AutomationTargetAreas />} />
-            <Route path="/automation-preventive-alerts" element={<ComingSoon />} />
+            {/* Continuous Improvements */}
+            <Route path="/automation-target-areas" element={<ComingSoon pageTitle="Potential Automation" />} />
+            <Route path="/automation-preventive-alerts" element={<ComingSoon pageTitle="Proactive Alerts" />} />
+            <Route path="/continuous-improvements/self-diagnosis" element={<ComingSoon pageTitle="Self Diagnosis" />} />
+            <Route path="/continuous-improvements/improvise-mttr" element={<ComingSoon pageTitle="Improvise MTTR" />} />
 
             {/* Effectiveness of Measures Section */}
             <Route path="/effectiveness-occurrence" element={<ComingSoon />} />

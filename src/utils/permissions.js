@@ -30,8 +30,9 @@ export function getDefaultPathForUser(isSuperAdmin, allowedPaths = null) {
 export function canAccessPath(path, isSuperAdmin, allowedPaths = null) {
   if (ALL_ADMIN_PATHS.includes(path)) return isSuperAdmin;
   if (isSuperAdmin) return true;
-  if (allowedPaths && Array.isArray(allowedPaths)) return allowedPaths.includes(path);
-  return LIMITED_USER_ALLOWED_PATHS.includes(path);
+  // Must match getAllowedPaths: sidebar shows merged base + role paths; access check must use the same set
+  const effective = getAllowedPaths(false, allowedPaths);
+  return effective.includes(path);
 }
 
 /**

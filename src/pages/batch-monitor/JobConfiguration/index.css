@@ -3,6 +3,33 @@
   padding: 32px;
 }
 
+/* Shared interval (one per section, below title — not per table row) */
+.job-config-section-interval {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding: 14px 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  max-width: 720px;
+}
+
+.job-config-section-interval-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #334155;
+  min-width: 88px;
+}
+
+.job-config-section-interval-input {
+  flex: 1;
+  min-width: 200px;
+  max-width: 360px;
+}
+
 /* Time Period header centred over Start/End columns */
 .job-config-time-period-header {
   text-align: center;

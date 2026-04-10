@@ -12,7 +12,15 @@ const PERMISSION_SECTIONS = [
   { title: "Resource Effectiveness", paths: ["/resource-queue-length", "/resource-incidents-resolved", "/resource-time-per-resolution"] },
   { title: "Troubleshooting Assistance", paths: ["/kedb", "/suggested-actions-depository", "/web-suggested-actions"] },
   { title: "Value Creation", paths: ["/preventive-measures", "/self-service-actions"] },
-  { title: "Potential Automation", paths: ["/automation-target-areas", "/automation-preventive-alerts"] },
+  {
+    title: "Continuous Improvements",
+    paths: [
+      "/automation-target-areas",
+      "/automation-preventive-alerts",
+      "/continuous-improvements/self-diagnosis",
+      "/continuous-improvements/improvise-mttr",
+    ],
+  },
   { title: "Effectiveness of Measures", paths: ["/effectiveness-occurrence", "/effectiveness-resolution-time"] },
   { title: "BI Report", paths: ["/bi-report"] },
   { title: "Admin", paths: ["/admin/roles", "/admin/users"] },

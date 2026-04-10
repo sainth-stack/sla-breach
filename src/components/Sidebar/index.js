@@ -24,13 +24,12 @@ import {
   MdSearch,
   MdSecurity,
   MdSelfImprovement,
-  MdLocationOn,
-  MdNotifications,
   MdEventNote,
   MdHistory,
   MdAdminPanelSettings,
   MdManageAccounts,
-  MdAssignmentInd
+  MdAssignmentInd,
+  MdNotifications,
 } from "react-icons/md";
 import { Link, useLocation } from "react-router-dom";
 import { getAllowedPaths } from "../../utils/permissions";
@@ -64,7 +63,7 @@ export default function Sidebar() {
     backgroundJobMonitoring: false,
     resourceEffectiveness: false,
     areasOfImprovement: false,
-    potentialAutomation: false,
+    continuousImprovements: false,
     effectivenessOfMeasures: false
   });
 
@@ -404,40 +403,67 @@ export default function Sidebar() {
                   </li>
                 )}
 
-                {/* Potential Automation Section */}
-                {(canShow("/automation-target-areas") || canShow("/automation-preventive-alerts")) && (
+                {/* Continuous Improvements */}
+                {(canShow("/automation-target-areas") ||
+                  canShow("/automation-preventive-alerts") ||
+                  canShow("/continuous-improvements/self-diagnosis") ||
+                  canShow("/continuous-improvements/improvise-mttr")) && (
                   <li className="sidebar-section">
                     <div
                       className="section-header"
-                      onClick={() => toggleSection("potentialAutomation")}
+                      onClick={() => toggleSection("continuousImprovements")}
                       role="button"
                       tabIndex={0}
                     >
                       <div className="header-content">
                         <MdSmartToy size={16} className="section-icon" />
-                        <span className="section-title">Potential Automation</span>
+                        <span className="section-title">Continuous Improvements</span>
                       </div>
-                      {expandedSections.potentialAutomation ? (
+                      {expandedSections.continuousImprovements ? (
                         <RiArrowDownSLine size={14} className="chevron-icon" />
                       ) : (
                         <RiArrowRightSLine size={14} className="chevron-icon" />
                       )}
                     </div>
-                    {expandedSections.potentialAutomation && (
+                    {expandedSections.continuousImprovements && (
                       <ul className="subsection-list">
                         {canShow("/automation-target-areas") && (
-                          <li className={`sidebar-item subsection ${location.pathname === "/automation-target-areas" ? "active" : ""}`}>
+                          <li
+                            className={`sidebar-item subsection ${location.pathname === "/automation-target-areas" ? "active" : ""}`}
+                          >
                             <Link to="/automation-target-areas" className="sidebar-link">
-                              <MdLocationOn size={14} className="link-icon" />
-                              <span className="link-text">Target Areas</span>
+                              <MdAutoAwesome size={14} className="link-icon" />
+                              <span className="link-text">Potential Automation</span>
                             </Link>
                           </li>
                         )}
                         {canShow("/automation-preventive-alerts") && (
-                          <li className={`sidebar-item subsection ${location.pathname === "/automation-preventive-alerts" ? "active" : ""}`}>
+                          <li
+                            className={`sidebar-item subsection ${location.pathname === "/automation-preventive-alerts" ? "active" : ""}`}
+                          >
                             <Link to="/automation-preventive-alerts" className="sidebar-link">
                               <MdNotifications size={14} className="link-icon" />
-                              <span className="link-text">Preventive Alerts</span>
+                              <span className="link-text">Proactive Alerts</span>
+                            </Link>
+                          </li>
+                        )}
+                        {canShow("/continuous-improvements/self-diagnosis") && (
+                          <li
+                            className={`sidebar-item subsection ${location.pathname === "/continuous-improvements/self-diagnosis" ? "active" : ""}`}
+                          >
+                            <Link to="/continuous-improvements/self-diagnosis" className="sidebar-link">
+                              <MdSearch size={14} className="link-icon" />
+                              <span className="link-text">Self Diagnosis</span>
+                            </Link>
+                          </li>
+                        )}
+                        {canShow("/continuous-improvements/improvise-mttr") && (
+                          <li
+                            className={`sidebar-item subsection ${location.pathname === "/continuous-improvements/improvise-mttr" ? "active" : ""}`}
+                          >
+                            <Link to="/continuous-improvements/improvise-mttr" className="sidebar-link">
+                              <MdTimer size={14} className="link-icon" />
+                              <span className="link-text">Improvise MTTR</span>
                             </Link>
                           </li>
                         )}

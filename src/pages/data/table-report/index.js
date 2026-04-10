@@ -1,9 +1,9 @@
 import React, { useState, useMemo } from 'react';
+import Papa from 'papaparse';
 import SharedFilters from '../filter/sharedReport';
 import SearchModal from '../../../components/SearchModal';
 
 const TableReport = ({ data, filters, onFilterChange, onResetFilters, getUniqueValues }) => {
-  console.log(filters)
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [currentPage, setCurrentPage] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -80,6 +80,30 @@ const TableReport = ({ data, filters, onFilterChange, onResetFilters, getUniqueV
     setIsModalOpen(true);
   };
 
+  const handleExportCsv = () => {
+    const rows = data.map((ticket) => ({
+      'Ticket ID': ticket.ticketId,
+      'Creation Date': ticket.creationDate,
+      Priority: ticket.priority,
+      'Assigned To': ticket.assignedTo,
+      'Macro Area - Name': ticket.marconaName,
+      'Current Status': ticket.currentStatus,
+      'Resolution SLA Time': ticket.totalTime,
+      'Elapsed Time (h)': ticket.elapsedTime,
+      'Remaining Time': ticket.timeToBreach,
+      Breached: ticket.isBreached ? 'Yes' : 'No',
+      'Request Type': ticket.requestType ?? '',
+    }));
+    const csv = Papa.unparse(rows);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `self-monitoring-export-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <>
       <div className="report-card">
@@ -95,12 +119,22 @@ const TableReport = ({ data, filters, onFilterChange, onResetFilters, getUniqueV
       />
 
       {/* Summary Info */}
-      <div className="flex justify-between items-center p-4 bg-gray-50 border-b">
+      <div className="flex justify-between items-center p-4 bg-gray-50 border-b flex-wrap gap-2">
         <div className="text-sm text-gray-600" style={{fontWeight:600}}>
           Showing {data.length} records
         </div>
-        <div className="text-sm font-medium text-gray-700">
-          Page {currentPage} of {totalPages}
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={handleExportCsv}
+            disabled={data.length === 0}
+            className="px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            Export CSV
+          </button>
+          <div className="text-sm font-medium text-gray-700">
+            Page {currentPage} of {totalPages}
+          </div>
         </div>
       </div>
 
