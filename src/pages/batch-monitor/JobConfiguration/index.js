@@ -17,6 +17,7 @@ import {
   configurationJobsURL,
   configurationApplicationsURL,
   configurationGlobalIntervalsURL,
+  sendEmailNotificationURL,
 } from "../../../const";
 import "../../admin/common.css";
 import "./index.css";
@@ -67,6 +68,8 @@ const JobConfiguration = () => {
   const [globalIntervalsLoading, setGlobalIntervalsLoading] = useState(true);
   const [savingJobInterval, setSavingJobInterval] = useState(false);
   const [savingAppInterval, setSavingAppInterval] = useState(false);
+  const [emailRecipient, setEmailRecipient] = useState("");
+  const [sendingEmail, setSendingEmail] = useState(false);
 
   const [jobForm] = Form.useForm();
   const [applicationForm] = Form.useForm();
@@ -366,6 +369,42 @@ const JobConfiguration = () => {
     }
   };
 
+  const sendEmailNotification = async () => {
+    if (!emailRecipient.trim()) {
+      message.error("Please enter an email recipient");
+      return;
+    }
+    
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(emailRecipient.trim())) {
+      message.error("Please enter a valid email address");
+      return;
+    }
+
+    setSendingEmail(true);
+    try {
+      const res = await fetch(sendEmailNotificationURL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          recipient: emailRecipient.trim(),
+        }),
+      });
+      
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.detail || res.statusText || "Failed to send email");
+      }
+      
+      message.success("Email notification sent successfully");
+      setEmailRecipient("");
+    } catch (e) {
+      message.error(e.message || "Could not send email notification");
+    } finally {
+      setSendingEmail(false);
+    }
+  };
+
   useEffect(() => {
     fetchJobs();
   }, [fetchJobs]);
@@ -382,6 +421,35 @@ const JobConfiguration = () => {
     <div className="admin-page-container job-config-page">
       <div className="admin-page-content">
         <div className="header-section">
+          <h1 className="page-title">Email Notification</h1>
+          <p className="page-subtitle">
+            Send email notifications for job and application configuration updates
+          </p>
+        </div>
+
+        <div className="job-config-section-interval" style={{ marginBottom: "2rem" }}>
+          <label className="job-config-section-interval-label" htmlFor="email-recipient">
+            Email Recipient
+          </label>
+          <Input
+            id="email-recipient"
+            allowClear
+            placeholder="Enter email address"
+            value={emailRecipient}
+            onChange={(e) => setEmailRecipient(e.target.value)}
+            className="job-config-section-interval-input"
+            type="email"
+          />
+          <Button
+            type="primary"
+            loading={sendingEmail}
+            onClick={sendEmailNotification}
+          >
+            Send Email
+          </Button>
+        </div>
+
+        <div className="header-section" style={{ marginTop: "2rem" }}>
           <h1 className="page-title">Job Configuration</h1>
           <p className="page-subtitle">
             Configure background jobs: Job Name, System, and Time Period (Start & End). Interval time below applies to all jobs in this section.
