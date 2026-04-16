@@ -4,6 +4,7 @@ import { message } from "antd";
 import { MdVisibility, MdVisibilityOff } from "react-icons/md";
 import { getDefaultPathForUser } from "../../utils/permissions";
 import { baseURL } from "../../const";
+import { sendAppLog, getLogMetaFromPath } from "../../utils/logger";
 import "./index.css";
 
 function getStoredUser() {
@@ -32,6 +33,16 @@ export function Login() {
       navigate(defaultPath, { replace: true });
     }
   }, [navigate]);
+
+  useEffect(() => {
+    const path = window.location.pathname;
+    const { moduleName } = getLogMetaFromPath(path);
+    sendAppLog({
+      pathname: path,
+      logType: "Page Opened",
+      content: `${moduleName} — page opened (${path})`
+    });
+  }, []);
 
   const handleLogin = async (event) => {
     event.preventDefault();

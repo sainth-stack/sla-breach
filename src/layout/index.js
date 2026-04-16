@@ -1,9 +1,10 @@
-import React from "react";
+import React, { useEffect } from "react";
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
 import "./style.css";
 import { Outlet, Navigate, useLocation } from "react-router-dom";
 import { canAccessPath, getDefaultPathForUser } from "../utils/permissions";
+import { sendAppLog, getLogMetaFromPath, isAdminRoutePath } from "../utils/logger";
 
 function getStoredUser() {
   try {
@@ -20,17 +21,27 @@ export function AdminLayout() {
   const isAuthenticatedFlag = localStorage.getItem("isAuthenticated") === "true";
   const user = getStoredUser();
   const isAuthenticated = !!token && !!isAuthenticatedFlag && !!user;
+  const isSuperAdmin = !!(user?.isSuperAdmin);
+  const allowedPaths = user?.allowedPaths ?? null;
+  const path = location.pathname;
+  const pathAllowed = isAuthenticated && canAccessPath(path, isSuperAdmin, allowedPaths);
 
-  // Without login: redirect to login
+  useEffect(() => {
+    if (!isAuthenticated || !pathAllowed) return;
+    if (isAdminRoutePath(path)) return;
+    const { moduleName } = getLogMetaFromPath(path);
+    sendAppLog({
+      pathname: path,
+      logType: "Page Opened",
+      content: `${moduleName} — page opened (${path})`
+    });
+  }, [path, isAuthenticated, pathAllowed, isSuperAdmin, allowedPaths]);
+
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
 
-  // Based on permission: redirect to user's default (first allowed path) if current path not allowed
-  const isSuperAdmin = !!(user.isSuperAdmin);
-  const allowedPaths = user.allowedPaths ?? null;
-  const path = location.pathname;
-  if (!canAccessPath(path, isSuperAdmin, allowedPaths)) {
+  if (!pathAllowed) {
     const defaultPath = getDefaultPathForUser(isSuperAdmin, allowedPaths);
     return <Navigate to={defaultPath} replace />;
   }

@@ -3,33 +3,13 @@ import ChatBot from '../../components/ChatBot';
 import { sendAppLog } from '../../utils/logger';
 import './index.css';
 
+// Page visit is logged globally from AdminLayout; this page only wires KB API success/error logs.
+
 const KEDB = () => {
-  const [hasUploadedFile, setHasUploadedFile] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user has uploaded a file
-    const uploadedFileInfo = localStorage.getItem('uploadedFile');
-    if (uploadedFileInfo) {
-      try {
-        const fileInfo = JSON.parse(uploadedFileInfo);
-        setHasUploadedFile(!!fileInfo.name);
-      } catch (error) {
-        console.error('Error parsing uploaded file info:', error);
-        setHasUploadedFile(false);
-      }
-    } else {
-      setHasUploadedFile(false);
-    }
     setIsLoading(false);
-  }, []);
-
-  useEffect(() => {
-    sendAppLog({
-      pathname: window.location.pathname,
-      logType: 'KEDB Page Opened',
-      content: 'KEDB page opened'
-    });
   }, []);
 
   if (isLoading) {

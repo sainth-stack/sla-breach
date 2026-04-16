@@ -3,6 +3,7 @@ import Plot from 'react-plotly.js';
 import { CircularProgress } from '@mui/material';
 import { Table } from 'antd';
 import { baseURL } from '../../const';
+import { getLogMetaFromPath } from '../../utils/logger';
 import './styles.css';
 
 const ChatBot = ({ 
@@ -109,10 +110,11 @@ const ChatBot = ({
       console.log('Backend response:', data);
 
       if (isKnowledgeBase && typeof onApiStatusLog === 'function') {
+        const { moduleName } = getLogMetaFromPath(window.location.pathname);
         onApiStatusLog({
           pathname: window.location.pathname,
           logType: 'S',
-          content: 'KEDB query API success'
+          content: `${moduleName} — query API success`
         });
       }
 
@@ -163,10 +165,11 @@ const ChatBot = ({
       console.error('Error:', error);
 
       if (isKnowledgeBase && typeof onApiStatusLog === 'function') {
+        const { moduleName } = getLogMetaFromPath(window.location.pathname);
         onApiStatusLog({
           pathname: window.location.pathname,
           logType: 'E',
-          content: `KEDB query API failed: ${error.message || 'Unknown error'}`
+          content: `${moduleName} — query API failed: ${error.message || 'Unknown error'}`
         });
       }
       

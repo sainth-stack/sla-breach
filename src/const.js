@@ -13,3 +13,4 @@ export const backgroundJobMonitorBaseURL = 'https://jobprocessmonitor-balanced-c
 export const configurationJobsURL = `${baseURL}/configuration/jobs`;
 export const configurationApplicationsURL = `${baseURL}/configuration/applications`;
 export const configurationGlobalIntervalsURL = `${baseURL}/configuration/global-intervals`;
+export const sendEmailNotificationURL = `${baseURL}/configuration/send-email`;
