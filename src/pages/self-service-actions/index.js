@@ -62,7 +62,7 @@ const SapTable = ({ data }) => {
     );
 };
 
-const NLP_ENQUIRER_URL = 'https://ams-enquirer.cfapps.us10-001.hana.ondemand.com/api/v1/enquire/query';
+const NLP_ENQUIRER_URL = 'https://ams-enquirer.cfapps.us10-001.hana.ondemand.com/api/v2/enquire/query';
 
 // Format NLP/Enquirer API response for display (handles various shapes)
 const formatNlpResponse = (data) => {
