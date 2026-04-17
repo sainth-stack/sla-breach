@@ -76,6 +76,29 @@ const DataSource = () => {
 
       const data = await response.json();
 
+      // Call the classification API
+      try {
+        const classifierFormData = new FormData();
+        classifierFormData.append('file', selectedFile);
+
+        const classifierResponse = await fetch(
+          'https://ams-classifier.cfapps.us10-001.hana.ondemand.com/process_file_replace',
+          {
+            method: 'POST',
+            body: classifierFormData,
+          }
+        );
+
+        if (classifierResponse.ok) {
+          const classifierData = await classifierResponse.json();
+          console.log('Classification API response:', classifierData);
+        } else {
+          console.warn('Classification API failed:', classifierResponse.status);
+        }
+      } catch (classifierError) {
+        console.error('Error calling classification API:', classifierError);
+      }
+
       // Store minimal file information
       const fileInfo = {
         name: selectedFile.name,
