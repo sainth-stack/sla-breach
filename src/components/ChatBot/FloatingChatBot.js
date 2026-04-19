@@ -95,16 +95,29 @@ const FloatingChatBot = ({
         data = response.data;
       } else {
         const apiEndpoint = (endpoint === "/predict/" ? testUrl : baseURL) + endpoint;
-        // Attach dataset if provided
-        if (dataset && Array.isArray(dataset) && dataset.length > 0) {
-          try {
-            formData.append('dataset', JSON.stringify(dataset));
-          } catch (e) {
-            console.warn('Failed to stringify dataset for chat request:', e);
+        // Explore_sla: JSON body (query + optional session_id + optional dataset). Multipart Form+File breaks FastAPI binding for `query`.
+        if (/Explore_sla/i.test(endpoint)) {
+          const jsonBody = { query: userMessage };
+          if (sessionId) jsonBody.session_id = sessionId;
+          if (dataset && Array.isArray(dataset) && dataset.length > 0) {
+            jsonBody.dataset = dataset;
           }
+          const response = await axios.post(apiEndpoint, jsonBody, {
+            headers: { 'Content-Type': 'application/json' },
+          });
+          data = response.data;
+        } else {
+          if (dataset && Array.isArray(dataset) && dataset.length > 0) {
+            try {
+              const blob = new Blob([JSON.stringify(dataset)], { type: 'application/json' });
+              formData.append('dataset_file', blob, 'dataset.json');
+            } catch (e) {
+              console.warn('Failed to attach dataset file for chat request:', e);
+            }
+          }
+          const response = await axios.post(apiEndpoint, formData);
+          data = response.data;
         }
-        const response = await axios.post(apiEndpoint, formData);
-        data = response.data;
       }
       console.log('Backend response:', data);
     
