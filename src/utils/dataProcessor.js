@@ -797,4 +797,72 @@ export const processFileData = (data) => {
   return [headers, ...processedRows];
 };
 
+/**
+ * Download processed SLA data as sla_report.xlsx (same formatting as legacy SLA Report page).
+ * @param {Array[]} csvData - [headers, ...rows]
+ */
+export function downloadSlaReportXlsx(csvData) {
+  if (!csvData || csvData.length === 0) return;
+
+  const wb = XLSX.utils.book_new();
+  const [headers, ...rows] = csvData;
+
+  const formattedRows = rows.map((row) => {
+    const newRow = [...row];
+    const dateIndexes = [0, 7];
+    const changeTimeIndex = headers.indexOf("Historical Status - Change Time");
+    if (changeTimeIndex !== -1 && newRow[changeTimeIndex]) {
+      const timeStr = newRow[changeTimeIndex].toString().padStart(6, "0");
+      newRow[changeTimeIndex] = `${timeStr.slice(0, 2)}:${timeStr.slice(2, 4)}:${timeStr.slice(4, 6)}`;
+    }
+
+    dateIndexes.forEach((index) => {
+      if (newRow[index]) {
+        if (typeof newRow[index] === "string" && newRow[index].match(/^\d{2}\/\d{2}\/\d{4}$/)) {
+          const [dd, mm, yyyy] = newRow[index].split("/");
+          newRow[index] = `${mm}/${dd}/${yyyy}`;
+        } else if (typeof newRow[index] === "number") {
+          const date = XLSX.SSF.parse_date_code(newRow[index]);
+          newRow[index] = `${String(date.m).padStart(2, "0")}/${String(date.d).padStart(2, "0")}/${date.y}`;
+        } else if (
+          typeof newRow[index] === "string" &&
+          newRow[index].match(/^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}:\d{2}$/)
+        ) {
+          const [datePart] = newRow[index].split(" ");
+          const [dd, mm, yyyy] = datePart.split("/");
+          newRow[index] = `${mm}/${dd}/${yyyy}`;
+        }
+      }
+    });
+    return newRow;
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...formattedRows]);
+
+  const highlightCols = headers.reduce((acc, header, idx) => {
+    if (YELLOW_FIELDS.includes(header)) acc[idx] = true;
+    return acc;
+  }, {});
+
+  Object.keys(ws).forEach((key) => {
+    if (key !== "!ref") {
+      const col = XLSX.utils.decode_cell(key).c;
+      if (highlightCols[col]) {
+        ws[key].s = {
+          fill: {
+            patternType: "solid",
+            fgColor: { rgb: "ADD8E6" },
+          },
+          font: {
+            bold: XLSX.utils.decode_cell(key).r === 0,
+          },
+        };
+      }
+    }
+  });
+
+  XLSX.utils.book_append_sheet(wb, ws, "ProcessedData");
+  XLSX.writeFile(wb, "sla_report.xlsx");
+}
+
 export { HOLIDAYS_BY_YEAR, YELLOW_FIELDS, SLA_TABLE, WORK_HOURS };

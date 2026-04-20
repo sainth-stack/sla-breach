@@ -151,8 +151,13 @@ const DataSource = () => {
     <div className="data-source-container">
       <div className="data-source-content">
         <div className="header-section">
-          <h1 className="page-title">Data Source</h1>
-          <p className="page-subtitle">Upload your data file to begin SLA monitoring and analysis</p>
+          <p className="page-eyebrow" style={{ fontSize: "0.75rem", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "#64748b", marginBottom: "0.35rem" }}>
+            Data Source
+          </p>
+          <h1 className="page-title">SLA Input File</h1>
+          <p className="page-subtitle">
+            Upload your CSV or Excel extract to the server for processing. This is the same entry point as before — now listed under Data Source in the sidebar.
+          </p>
         </div>
 
         <div className="upload-section">

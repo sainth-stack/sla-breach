@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { RiArrowDownSLine, RiArrowRightSLine } from "react-icons/ri";
 import {
   MdDashboard,
@@ -30,6 +30,8 @@ import {
   MdManageAccounts,
   MdAssignmentInd,
   MdNotifications,
+  MdDownload,
+  MdUploadFile,
 } from "react-icons/md";
 import { Link, useLocation } from "react-router-dom";
 import { getAllowedPaths } from "../../utils/permissions";
@@ -64,8 +66,20 @@ export default function Sidebar() {
     resourceEffectiveness: false,
     areasOfImprovement: false,
     continuousImprovements: false,
-    effectivenessOfMeasures: false
+    effectivenessOfMeasures: false,
+    dataSourceGroup: false,
   });
+
+  useEffect(() => {
+    const p = location.pathname;
+    if (p === "/data-source" || p === "/sla-export") {
+      setExpandedSections((prev) => ({
+        ...prev,
+        amsProEn: true,
+        dataSourceGroup: true,
+      }));
+    }
+  }, [location.pathname]);
 
   const toggleSection = (section) => {
     setExpandedSections(prev => ({
@@ -97,17 +111,54 @@ export default function Sidebar() {
             </div>
             {expandedSections.amsProEn && (
               <div className="main-content">
-                {/* Data Source Section */}
-                {canShow("/data-source") && (
-                  <li className="sidebar-section data-source-section">
-                    <ul className="subsection-list">
-                      <li className={`sidebar-item subsection ${location.pathname === "/data-source" ? "active" : ""}`}>
-                        <Link to="/data-source" className="sidebar-link">
-                          <MdStorage size={16} className="link-icon" />
-                          <span className="link-text">Data Source</span>
-                        </Link>
-                      </li>
-                    </ul>
+                {/* Data Source — parent with children: SLA Input File, Export output file */}
+                {(canShow("/data-source") || canShow("/sla-export")) && (
+                  <li className="sidebar-section">
+                    <div
+                      className="section-header"
+                      onClick={() => toggleSection("dataSourceGroup")}
+                      role="button"
+                      tabIndex={0}
+                    >
+                      <div className="header-content">
+                        <MdStorage size={16} className="section-icon" />
+                        <span className="section-title">Data Source</span>
+                      </div>
+                      {expandedSections.dataSourceGroup ? (
+                        <RiArrowDownSLine size={14} className="chevron-icon" />
+                      ) : (
+                        <RiArrowRightSLine size={14} className="chevron-icon" />
+                      )}
+                    </div>
+                    {expandedSections.dataSourceGroup && (
+                      <ul className="subsection-list">
+                           {(canShow("/sla-export") || canShow("/data-source")) && (
+                          <li
+                            className={`sidebar-item subsection ${
+                              location.pathname === "/sla-export" ? "active" : ""
+                            }`}
+                          >
+                            <Link to="/sla-export" className="sidebar-link">
+                              <MdDownload size={14} className="link-icon" />
+                              <span className="link-text">Export output file</span>
+                            </Link>
+                          </li>
+                        )}
+                        {canShow("/data-source") && (
+                          <li
+                            className={`sidebar-item subsection ${
+                              location.pathname === "/data-source" ? "active" : ""
+                            }`}
+                          >
+                            <Link to="/data-source" className="sidebar-link">
+                              <MdUploadFile size={14} className="link-icon" />
+                              <span className="link-text">SLA Input File</span>
+                            </Link>
+                          </li>
+                        )}
+                     
+                      </ul>
+                    )}
                   </li>
                 )}
 

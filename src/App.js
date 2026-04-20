@@ -6,6 +6,7 @@ import DataSource from "./pages/data-source";
 import { AdminLayout } from './layout';
 import { Login } from "./pages/Login";
 import { MainPages } from "./pages/data";
+import SlaExportPage from "./pages/sla-export";
 import ComingSoon from "./pages/ComingSoon";
 import BIReport from "./pages/bi-report";
 import SLACombined from "./pages/sla-combined";
@@ -27,6 +28,7 @@ function App() {
             <Route path="/" element={<DataSource />} />
             <Route path="/data-source" element={<DataSource />} />
             <Route path="/self-monitoring" element={<MainPages />} />
+            <Route path="/sla-export" element={<SlaExportPage />} />
             <Route path="/incident-management" element={<IncidentManagement />} />
             <Route path="/kedb" element={<KEDB />} />
 

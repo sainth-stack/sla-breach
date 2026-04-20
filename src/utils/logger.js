@@ -21,6 +21,10 @@ const PATH_LOG_CONFIG = {
     moduleName: 'Self Monitoring',
     programName: 'data/index.js'
   },
+  '/sla-export': {
+    moduleName: 'SLA Export',
+    programName: 'sla-export/index.js'
+  },
   '/incident-management': {
     moduleName: 'Incident Management',
     programName: 'incident-management/index.js'

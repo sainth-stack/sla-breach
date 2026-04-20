@@ -32,6 +32,14 @@ export function canAccessPath(path, isSuperAdmin, allowedPaths = null) {
   if (isSuperAdmin) return true;
   // Must match getAllowedPaths: sidebar shows merged base + role paths; access check must use the same set
   const effective = getAllowedPaths(false, allowedPaths);
+  if (path === "/sla-export") {
+    return (
+      effective.includes("/sla-export") ||
+      effective.includes("/data-source") ||
+      effective.includes("/self-monitoring") ||
+      effective.includes("/sla-resolution-response-time")
+    );
+  }
   return effective.includes(path);
 }
 
