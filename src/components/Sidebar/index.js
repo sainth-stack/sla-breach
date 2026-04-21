@@ -132,7 +132,7 @@ export default function Sidebar() {
                     </div>
                     {expandedSections.dataSourceGroup && (
                       <ul className="subsection-list">
-                           {(canShow("/sla-export") || canShow("/data-source")) && (
+                           {/* {(canShow("/sla-export") || canShow("/data-source")) && (
                           <li
                             className={`sidebar-item subsection ${
                               location.pathname === "/sla-export" ? "active" : ""
@@ -143,7 +143,7 @@ export default function Sidebar() {
                               <span className="link-text">Export output file</span>
                             </Link>
                           </li>
-                        )}
+                        )} */}
                         {canShow("/data-source") && (
                           <li
                             className={`sidebar-item subsection ${
