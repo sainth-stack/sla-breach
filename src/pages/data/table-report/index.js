@@ -20,25 +20,44 @@ const TableReport = ({ data, filters, onFilterChange, onResetFilters, getUniqueV
     { key: 'currentStatus', name: 'Current Status' },
     { key: 'totalTime', name: 'Resolution SLA Time' },
     { key: 'elapsedTime', name: 'Elapsed Time (h)' },
-    { key: 'totalTime', name: 'Remaining Time' },
+    { key: 'timeToBreach', name: 'Remaining Time' },
     { key: 'isBreached', name: 'Breached' }
   ];
+
+  const NUMERIC_SORT_KEYS = new Set(['totalTime', 'elapsedTime', 'timeToBreach']);
+
+  const compareCellValues = (key, aRaw, bRaw) => {
+    if (NUMERIC_SORT_KEYS.has(key)) {
+      const na = parseFloat(aRaw);
+      const nb = parseFloat(bRaw);
+      const aValid = aRaw !== '' && aRaw != null && !Number.isNaN(na);
+      const bValid = bRaw !== '' && bRaw != null && !Number.isNaN(nb);
+      if (!aValid && !bValid) return 0;
+      if (!aValid) return 1;
+      if (!bValid) return -1;
+      if (na < nb) return -1;
+      if (na > nb) return 1;
+      return 0;
+    }
+    if (aRaw == null && bRaw == null) return 0;
+    if (aRaw == null) return 1;
+    if (bRaw == null) return -1;
+    if (typeof aRaw === 'boolean' || typeof bRaw === 'boolean') {
+      if (aRaw === bRaw) return 0;
+      return aRaw ? 1 : -1;
+    }
+    const as = String(aRaw);
+    const bs = String(bRaw);
+    return as.localeCompare(bs, undefined, { numeric: true, sensitivity: 'base' });
+  };
 
   // Sort data
   const sortedData = useMemo(() => {
     if (!sortConfig.key) return data;
-    
+
     return [...data].sort((a, b) => {
-      const aValue = a[sortConfig.key];
-      const bValue = b[sortConfig.key];
-      
-      if (aValue < bValue) {
-        return sortConfig.direction === 'asc' ? -1 : 1;
-      }
-      if (aValue > bValue) {
-        return sortConfig.direction === 'asc' ? 1 : -1;
-      }
-      return 0;
+      const cmp = compareCellValues(sortConfig.key, a[sortConfig.key], b[sortConfig.key]);
+      return sortConfig.direction === 'asc' ? cmp : -cmp;
     });
   }, [data, sortConfig]);
 

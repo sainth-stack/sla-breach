@@ -420,7 +420,7 @@ const JobConfiguration = () => {
   return (
     <div className="admin-page-container job-config-page">
       <div className="admin-page-content">
-        <div className="header-section">
+        {/* <div className="header-section">
           <h1 className="page-title">Email Notification</h1>
           <p className="page-subtitle">
             Send email notifications for job and application configuration updates
@@ -447,7 +447,7 @@ const JobConfiguration = () => {
           >
             Send Email
           </Button>
-        </div>
+        </div> */}
 
         <div className="header-section" style={{ marginTop: "2rem" }}>
           <h1 className="page-title">Job Configuration</h1>

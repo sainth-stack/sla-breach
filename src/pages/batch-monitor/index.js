@@ -1,9 +1,8 @@
 /**
- * Background Job Monitoring
- * API: {baseURL}/jobs/Z_I_FA_JOBS → { "d": { "results": [ { JobName, JobCount, RunTimeSeconds, ... } ] } }
- * - Select the job (entity set)
- * - Table with filter by batch (JobCount); columns + Avg Runtime (Daily / 15-day), Standard Deviation, Tolerance
- * - Alert when a run exceeds tolerance (runtime > 15-day avg + tolerance)
+ * Background Job Monitoring (/process-monitor/thanksgiving)
+ * API: {baseURL}/jobs/Z_I_FA_JOBS → { "d": { "results": [ { JobName, RunTimeSeconds, ... } ] } }
+ * - Table columns: Jobname, Runtime, Avg run time, Scheduled start date, Actual end date, Status - Failed, Scheduled by
+ * - Row highlight when runtime exceeds 15-day avg + tolerance (stats computed in background)
  */
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import axios from 'axios';
@@ -52,33 +51,55 @@ const getRuntimeSeconds = (row) => {
   return 0;
 };
 
-/** Table column config: key, label, format */
-const DATA_COLUMNS = [
-  { key: 'JobName', label: 'Job Name' },
-  { key: 'JobCount', label: 'Batch (Job Count)' },
-  { key: 'RunTimeSeconds', label: 'Runtime (s)' },
-  { key: 'ScheduledStartDate', label: 'Scheduled Start', format: 'odataDate' },
-  { key: 'ScheduledStartTime', label: 'Scheduled Time' },
-  { key: 'ExecutionStartDate', label: 'Execution Start', format: 'odataDate' },
-  { key: 'ExecutionStartTime', label: 'Execution Time' },
-  { key: 'ActualEndDate', label: 'Actual End Date', format: 'odataDate' },
-  { key: 'ActualEndTime', label: 'Actual End Time' },
-  { key: 'JobStatus', label: 'Status' },
-  { key: 'JobClass', label: 'Job Class' },
-  { key: 'ScheduledBy', label: 'Scheduled By' },
-  { key: 'StartDelayDays', label: 'Start Delay (days)' },
-  { key: 'StartHour', label: 'Start Hour' },
-  { key: 'IsWeekend', label: 'Is Weekend' },
+/** Visible columns for /process-monitor/thanksgiving (requested headers only) */
+const DISPLAY_COLUMNS = [
+  { key: 'JobName', label: 'Jobname' },
+  { key: 'RunTimeSeconds', label: 'Runtime' },
+  { key: '_avgRunTime', label: 'Avg run time' },
+  { key: '_scheduledStart', label: 'Scheduled start date' },
+  { key: '_actualEnd', label: 'Actual end date' },
+  { key: 'JobStatus', label: 'Status - Failed' },
+  { key: 'ScheduledBy', label: 'Scheduled by' },
 ];
 
-const formatCell = (row, col) => {
-  const val = row[col.key];
-  if (val == null && col.key !== '_avgRunTime') return '—';
-  if (col.key === '_avgRunTime') return typeof row._avgRunTime === 'number' ? row._avgRunTime.toFixed(2) : '—';
-  if (col.format === 'odataDate') {
-    const ms = parseODataDate(val);
-    return ms != null ? new Date(ms).toLocaleString() : String(val);
+const formatScheduledStart = (row) => {
+  const ms = parseODataDate(row.ScheduledStartDate);
+  if (ms == null) return '—';
+  const datePart = new Date(ms).toLocaleString();
+  const t = row.ScheduledStartTime;
+  if (t != null && String(t).trim() !== '') {
+    return `${datePart} (${t})`;
   }
+  return datePart;
+};
+
+const formatActualEnd = (row) => {
+  const ms = parseODataDate(row.ActualEndDate);
+  if (ms == null) return '—';
+  const datePart = new Date(ms).toLocaleString();
+  const t = row.ActualEndTime;
+  if (t != null && String(t).trim() !== '') {
+    return `${datePart} (${t})`;
+  }
+  return datePart;
+};
+
+const formatDisplayCell = (row, col) => {
+  if (col.key === 'JobName') {
+    const n = row.JobName ?? row.jobName;
+    return n != null && String(n).trim() !== '' ? String(n) : '—';
+  }
+  if (col.key === '_avgRunTime') {
+    return typeof row._avgRunTime === 'number' ? `${row._avgRunTime.toFixed(2)}s` : '—';
+  }
+  if (col.key === '_scheduledStart') return formatScheduledStart(row);
+  if (col.key === '_actualEnd') return formatActualEnd(row);
+  if (col.key === 'RunTimeSeconds') {
+    const s = getRuntimeSeconds(row);
+    return s > 0 ? `${s}` : String(row.RunTimeSeconds ?? '—');
+  }
+  const val = row[col.key];
+  if (val == null || val === '') return '—';
   return String(val);
 };
 
@@ -265,28 +286,6 @@ const BackgroundJobMonitoring = () => {
     });
   }, [filteredData, dailyAvg, fifteenDayAvg, standardDeviation, toleranceSeconds]);
 
-  const columnOrder = useMemo(() => {
-    const base = [...DATA_COLUMNS];
-    const rtIdx = base.findIndex((c) => c.key === 'RunTimeSeconds');
-    const avgCol = { key: '_avgRunTime', label: 'Avg Run Time (s)' };
-    if (rtIdx >= 0) {
-      const out = [...base];
-      out.splice(rtIdx + 1, 0, avgCol);
-      return out;
-    }
-    return [...base, avgCol];
-  }, []);
-
-  const allTableColumns = useMemo(
-    () => columnOrder.concat([
-      { key: '_avgRuntimeDaily', label: 'Avg Runtime (Daily)' },
-      { key: '_avgRuntime15Day', label: 'Avg Runtime (15-day)' },
-      { key: '_standardDeviation', label: 'Standard Deviation' },
-      { key: '_tolerance', label: 'Tolerance' },
-    ]),
-    [columnOrder]
-  );
-
   const formatDateTime = (d) => (d && !isNaN(d.getTime()) ? d.toLocaleString() : '—');
 
   return (
@@ -347,7 +346,7 @@ const BackgroundJobMonitoring = () => {
             <table className="job-monitor-table">
               <thead>
                 <tr>
-                  {allTableColumns.map((col) => (
+                  {DISPLAY_COLUMNS.map((col) => (
                     <th key={col.key}>{col.label}</th>
                   ))}
                 </tr>
@@ -355,33 +354,15 @@ const BackgroundJobMonitoring = () => {
               <tbody>
                 {rowsWithStats.length === 0 ? (
                   <tr>
-                    <td colSpan={allTableColumns.length} className="empty-cell">
+                    <td colSpan={DISPLAY_COLUMNS.length} className="empty-cell">
                       No data
                     </td>
                   </tr>
                 ) : (
                   rowsWithStats.map((row, idx) => (
                     <tr key={idx} className={row._exceedsTolerance ? 'row-exceeds' : ''}>
-                      {allTableColumns.map((col) => (
-                        <td key={col.key}>
-                          {col.key === '_avgRuntimeDaily'
-                            ? row._avgRuntimeDaily != null
-                              ? row._avgRuntimeDaily.toFixed(2) + 's'
-                              : '—'
-                            : col.key === '_avgRuntime15Day'
-                            ? row._avgRuntime15Day != null
-                              ? row._avgRuntime15Day.toFixed(2) + 's'
-                              : '—'
-                            : col.key === '_standardDeviation'
-                            ? row._standardDeviation != null
-                              ? row._standardDeviation.toFixed(2) + 's'
-                              : '—'
-                            : col.key === '_tolerance'
-                            ? row._tolerance != null
-                              ? row._tolerance.toFixed(2) + 's'
-                              : '—'
-                            : formatCell(row, col)}
-                        </td>
+                      {DISPLAY_COLUMNS.map((col) => (
+                        <td key={col.key}>{formatDisplayCell(row, col)}</td>
                       ))}
                     </tr>
                   ))

@@ -102,7 +102,7 @@ export default function Sidebar() {
             >
               <div className="header-content">
                 <MdDashboard size={18} className="section-icon" />
-                <span className="section-title" style={{textTransform: ''}}>AMS ProEn</span>
+                <span className="section-title" style={{textTransform: ''}}>Bainocular</span>
               </div>
               {expandedSections.amsProEn ? 
                 <RiArrowDownSLine size={18} className="chevron-icon" /> : 
@@ -391,14 +391,14 @@ export default function Sidebar() {
                             </Link>
                           </li>
                         )}
-                        {canShow("/suggested-actions-depository") && (
+                        {/* {canShow("/suggested-actions-depository") && (
                           <li className={`sidebar-item subsection ${location.pathname === "/suggested-actions-depository" ? "active" : ""}`}>
                             <Link to="/suggested-actions-depository" className="sidebar-link">
                               <MdStorage size={14} className="link-icon" />
                               <span className="link-text">Suggested Actions - Repository</span>
                             </Link>
                           </li>
-                        )}
+                        )} */}
                         {canShow("/web-suggested-actions") && (
                           <li className={`sidebar-item subsection ${location.pathname === "/web-suggested-actions" ? "active" : ""}`}>
                             <Link to="/web-suggested-actions" className="sidebar-link">
