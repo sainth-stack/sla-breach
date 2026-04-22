@@ -1,7 +1,7 @@
 /**
  * Background Job Monitoring (/process-monitor/thanksgiving)
  * API: {baseURL}/jobs/Z_I_FA_JOBS → { "d": { "results": [ { JobName, RunTimeSeconds, ... } ] } }
- * - Table columns: Jobname, Runtime, Avg run time, Scheduled start date, Actual end date, Status - Failed, Scheduled by
+ * - Table columns: Jobname, Runtime, Avg run time, Scheduled start date, Execution time (ExecutionStartDate), Actual end date, Status, Scheduled by
  * - Row highlight when runtime exceeds 15-day avg + tolerance (stats computed in background)
  */
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -57,31 +57,37 @@ const DISPLAY_COLUMNS = [
   { key: 'RunTimeSeconds', label: 'Runtime' },
   { key: '_avgRunTime', label: 'Avg run time' },
   { key: '_scheduledStart', label: 'Scheduled start date' },
+  { key: '_executionTime', label: 'Execution time' },
   { key: '_actualEnd', label: 'Actual end date' },
-  { key: 'JobStatus', label: 'Status - Failed' },
+  { key: 'JobStatus', label: 'Status' },
   { key: 'ScheduledBy', label: 'Scheduled by' },
 ];
 
 const formatScheduledStart = (row) => {
   const ms = parseODataDate(row.ScheduledStartDate);
   if (ms == null) return '—';
-  const datePart = new Date(ms).toLocaleString();
-  const t = row.ScheduledStartTime;
-  if (t != null && String(t).trim() !== '') {
-    return `${datePart} (${t})`;
-  }
-  return datePart;
+  return new Date(ms).toLocaleString();
 };
 
 const formatActualEnd = (row) => {
   const ms = parseODataDate(row.ActualEndDate);
   if (ms == null) return '—';
-  const datePart = new Date(ms).toLocaleString();
-  const t = row.ActualEndTime;
-  if (t != null && String(t).trim() !== '') {
-    return `${datePart} (${t})`;
-  }
-  return datePart;
+  return new Date(ms).toLocaleString();
+};
+
+/** Execution start from API OData date (e.g. "/Date(1776816000000)/") */
+const formatExecutionStart = (row) => {
+  const ms = parseODataDate(row.ExecutionStartDate);
+  if (ms == null) return '—';
+  return new Date(ms).toLocaleString();
+};
+
+const formatJobStatus = (row) => {
+  const raw = row.JobStatus ?? row.jobStatus;
+  if (raw == null || raw === '') return '—';
+  const s = String(raw).trim();
+  if (s.toUpperCase() === 'F') return 'Failed';
+  return s;
 };
 
 const formatDisplayCell = (row, col) => {
@@ -94,6 +100,8 @@ const formatDisplayCell = (row, col) => {
   }
   if (col.key === '_scheduledStart') return formatScheduledStart(row);
   if (col.key === '_actualEnd') return formatActualEnd(row);
+  if (col.key === '_executionTime') return formatExecutionStart(row);
+  if (col.key === 'JobStatus') return formatJobStatus(row);
   if (col.key === 'RunTimeSeconds') {
     const s = getRuntimeSeconds(row);
     return s > 0 ? `${s}` : String(row.RunTimeSeconds ?? '—');
