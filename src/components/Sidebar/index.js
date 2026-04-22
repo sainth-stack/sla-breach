@@ -102,7 +102,7 @@ export default function Sidebar() {
             >
               <div className="header-content">
                 <MdDashboard size={18} className="section-icon" />
-                <span className="section-title" style={{textTransform: ''}}>Bainocular</span>
+                <span className="section-title" style={{textTransform: ''}}>BAInocular</span>
               </div>
               {expandedSections.amsProEn ? 
                 <RiArrowDownSLine size={18} className="chevron-icon" /> : 
