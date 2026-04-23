@@ -1,6 +1,6 @@
 /**
- * Routes allowed for non-admin (limited) users.
- * Admin (isSuperAdmin) can access all routes.
+ * Default routes for limited users who have no role (login returns allowed_paths: null).
+ * Users with a role must get paths only from that role — do not merge these in.
  * Admin-only routes (roles/users) are only in ALL_ADMIN_PATHS.
  */
 export const LIMITED_USER_ALLOWED_PATHS = ['/kedb', '/suggested-actions-depository', '/web-suggested-actions'];
@@ -17,7 +17,10 @@ export const DEFAULT_PATH_FOR_LIMITED_USER = '/kedb';
  */
 export function getDefaultPathForUser(isSuperAdmin, allowedPaths = null) {
   if (isSuperAdmin) return '/';
-  return (allowedPaths && allowedPaths[0]) || DEFAULT_PATH_FOR_LIMITED_USER;
+  if (Array.isArray(allowedPaths) && allowedPaths.length > 0 && allowedPaths[0]) {
+    return allowedPaths[0];
+  }
+  return DEFAULT_PATH_FOR_LIMITED_USER;
 }
 
 /**
@@ -30,7 +33,7 @@ export function getDefaultPathForUser(isSuperAdmin, allowedPaths = null) {
 export function canAccessPath(path, isSuperAdmin, allowedPaths = null) {
   if (ALL_ADMIN_PATHS.includes(path)) return isSuperAdmin;
   if (isSuperAdmin) return true;
-  // Must match getAllowedPaths: sidebar shows merged base + role paths; access check must use the same set
+  // Must match getAllowedPaths (role paths only when assigned; else legacy defaults)
   const effective = getAllowedPaths(false, allowedPaths);
   if (path === "/sla-export") {
     return (
@@ -46,11 +49,16 @@ export function canAccessPath(path, isSuperAdmin, allowedPaths = null) {
 /**
  * Get allowed paths for the current user (for sidebar visibility).
  * @param {boolean} isSuperAdmin
- * @param {string[]|null} allowedPaths - from API (null = all)
+ * @param {string[]|null} allowedPaths - from login: null if no role paths from server; non-empty array = role permissions only
  * @returns {string[]|null} - List of allowed path strings, or null meaning "all" for admin
  */
 export function getAllowedPaths(isSuperAdmin, allowedPaths = null) {
   if (isSuperAdmin) return null; // null = all paths
-  if (allowedPaths && Array.isArray(allowedPaths)) return [...LIMITED_USER_ALLOWED_PATHS, ...allowedPaths].filter((p, i, a) => a.indexOf(p) === i);
+  if (Array.isArray(allowedPaths) && allowedPaths.length > 0) {
+    return [...allowedPaths]
+      .map((p) => (typeof p === 'string' ? p.trim() : ''))
+      .filter(Boolean)
+      .filter((p, i, a) => a.indexOf(p) === i);
+  }
   return LIMITED_USER_ALLOWED_PATHS;
 }
