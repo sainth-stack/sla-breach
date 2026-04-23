@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import axios from 'axios';
-import { baseURL } from '../../const';
+import { baseURL, vectorizerProblemDescriptionURL, vectorizerSimilarTicketsURL } from '../../const';
 import './index.css';
 
 const SearchModal = ({ isOpen, onClose, description, ticketId, searchType }) => {
@@ -12,46 +12,61 @@ const SearchModal = ({ isOpen, onClose, description, ticketId, searchType }) => 
     const lastFetchKey = useRef('');
 
     useEffect(() => {
-        if (isOpen && description && searchType) {
-            // Create a unique key for this fetch request
-            const fetchKey = `${searchType}-${description}`;
-            
-            // Only fetch if we haven't fetched this exact request yet
+        if (isOpen && searchType) {
+            const fetchKey = `${searchType}-${ticketId}`;
             if (fetchKey !== lastFetchKey.current || !hasFetchedRef.current) {
                 lastFetchKey.current = fetchKey;
                 hasFetchedRef.current = true;
                 fetchResults();
             }
         } else if (!isOpen) {
-            // Reset when modal closes
             hasFetchedRef.current = false;
             lastFetchKey.current = '';
             setResults('');
             setError(null);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isOpen, description, searchType]);
+    }, [isOpen, description, searchType, ticketId]);
 
     const fetchResults = async () => {
         setIsLoading(true);
         setError(null);
         setResults('');
 
+        const queryText = String(description ?? '').trim();
+        if (!queryText) {
+            setError('No text in Request - Text Request for this ticket.');
+            setIsLoading(false);
+            return;
+        }
+
         try {
             let response;
-            
+
             if (searchType === 'similarity') {
-                // Call Similarity Search API (KEDB)
                 response = await axios.post(
-                    'https://ams-vectorizer.cfapps.us10-001.hana.ondemand.com/v3/lux/similar-tickets/query',
-                    { query: description },
+                    vectorizerSimilarTicketsURL,
+                    { query: queryText },
                     { headers: { 'Content-Type': 'application/json' } }
                 );
             } else if (searchType === 'webSearch') {
-                // Call Web Search API
+                let problemForWebSearch = queryText;
+                try {
+                    const probRes = await axios.post(
+                        vectorizerProblemDescriptionURL,
+                        { query: queryText },
+                        { headers: { 'Content-Type': 'application/json' } }
+                    );
+                    const summarized = probRes?.data?.description;
+                    if (summarized != null && String(summarized).trim() !== '') {
+                        problemForWebSearch = String(summarized).trim();
+                    }
+                } catch (e) {
+                    console.warn('get-problem-description failed, using raw Request - Text Request', e);
+                }
                 response = await axios.post(
                     `${baseURL}/web_search`,
-                    { problem: description },
+                    { problem: problemForWebSearch },
                     { headers: { 'Content-Type': 'application/json' } }
                 );
             }

@@ -36,7 +36,8 @@ const ReportViewer = ({ rawData, headerIndices }) => {
     MARCO:9,
     REQ_STATUS: rawData[0].indexOf("Req. Status - Description"),
     RESOLUTION_DATE: rawData[0].indexOf("Req. Resolution Date"),
-    REQUEST_TYPE: rawData[0].indexOf("Req. Type - Description EN")
+    REQUEST_TYPE: rawData[0].indexOf("Req. Type - Description EN"),
+    TEXT_REQUEST: rawData[0].indexOf("Request - Text Request"),
   };
 
   const processedData = useMemo(() => {
@@ -64,6 +65,10 @@ const ReportViewer = ({ rawData, headerIndices }) => {
         priority: lastRow[COLUMNS.PRIORITY],
         assignedTo: lastRow[COLUMNS.ASSIGNED_TO],
         marconaName: lastRow[COLUMNS.MARCO],
+        textRequest:
+          COLUMNS.TEXT_REQUEST >= 0 && lastRow[COLUMNS.TEXT_REQUEST] != null
+            ? String(lastRow[COLUMNS.TEXT_REQUEST])
+            : '',
         currentStatus: lastRow[COLUMNS.CURRENT_STATUS],
         elapsedTime: lastRow[COLUMNS.ELAPSED_TIME],
         isBreached:lastRow[COLUMNS.RESP_REM] <0 ? true : false,

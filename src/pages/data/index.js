@@ -97,7 +97,8 @@ export const MainPages = () => {
         RESP_REM: 35,
         REQ_STATUS: headers.indexOf("Req. Status - Description"),
         RESOLUTION_DATE: headers.indexOf("Req. Resolution Date"),
-        REQUEST_TYPE: headers.indexOf("Req. Type - Description EN")
+        REQUEST_TYPE: headers.indexOf("Req. Type - Description EN"),
+        TEXT_REQUEST: headers.indexOf("Request - Text Request"),
       };
 
       const groups = new Map();
@@ -117,6 +118,10 @@ export const MainPages = () => {
           priority: lastRow?.[COLUMNS.PRIORITY],
           assignedTo: lastRow?.[COLUMNS.ASSIGNED_TO],
           marconaName: lastRow?.[COLUMNS.MARCO],
+          textRequest:
+            COLUMNS.TEXT_REQUEST >= 0 && lastRow?.[COLUMNS.TEXT_REQUEST] != null
+              ? String(lastRow[COLUMNS.TEXT_REQUEST])
+              : '',
           currentStatus: lastRow?.[COLUMNS.CURRENT_STATUS],
           elapsedTime: lastRow?.[COLUMNS.ELAPSED_TIME],
           isBreached: !isNaN(respRemVal) ? respRemVal < 0 : false,

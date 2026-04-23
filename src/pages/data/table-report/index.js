@@ -106,6 +106,7 @@ const TableReport = ({ data, filters, onFilterChange, onResetFilters, getUniqueV
       Priority: ticket.priority,
       'Assigned To': ticket.assignedTo,
       'Macro Area - Name': ticket.marconaName,
+      'Request - Text Request': ticket.textRequest ?? '',
       'Current Status': ticket.currentStatus,
       'Resolution SLA Time': ticket.totalTime,
       'Elapsed Time (h)': ticket.elapsedTime,
@@ -309,7 +310,7 @@ const TableReport = ({ data, filters, onFilterChange, onResetFilters, getUniqueV
             setIsModalOpen(false);
             setSelectedTicket(null);
           }}
-          description={selectedTicket.marconaName || ''}
+          description={selectedTicket.textRequest != null ? String(selectedTicket.textRequest) : ''}
           ticketId={selectedTicket.ticketId}
           searchType={selectedTicket.searchType}
         />

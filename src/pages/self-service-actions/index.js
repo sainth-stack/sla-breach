@@ -2,9 +2,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import { baseURL } from '../../const';
 import s4Logo from '../../assets/s4.png';
-import eccLogo from '../../assets/ecc.jpeg';
-import s4CloudLogo from '../../assets/s4-cloud.jpg';
-import sopLogo from '../../assets/sop-logo.png';
+// import eccLogo from '../../assets/ecc.jpeg';
+// import s4CloudLogo from '../../assets/s4-cloud.jpg';
+// import sopLogo from '../../assets/sop-logo.png';
 import nlpLogo from '../../assets/nlp-logo.png';
 import './index.css';
 
@@ -263,10 +263,10 @@ const SelfServiceActions = () => {
 
     const cards = [
         { id: 's4', title: 'S/4HANA', desc: 'Query Sales Orders, Purchase Orders and more.', logo: s4Logo, available: true, badge: 'Live' },
-        { id: 'btp', title: 'SAP ECC', desc: 'Self Service for SAP ECC system.', logo: eccLogo, available: false, badge: 'Soon' },
-        { id: 'batch', title: 'SAP S/4 Cloud', desc: 'Self Service for SAP S/4 Cloud system.', logo: s4CloudLogo, available: false, badge: 'Soon' },
-        { id: 'sop-know-errors', title: 'SOP - Know Errors', desc: 'Standard operating procedures and known errors.', logo: sopLogo, available: false, badge: 'Coming Soon' },
-        { id: 'nlp-analysis', title: 'NLP Analysis', desc: 'Natural language processing insights.', logo: nlpLogo, available: true, badge: 'Live' },
+        // { id: 'btp', title: 'SAP ECC', desc: 'Self Service for SAP ECC system.', logo: eccLogo, available: false, badge: 'Soon' },
+        // { id: 'batch', title: 'SAP S/4 Cloud', desc: 'Self Service for SAP S/4 Cloud system.', logo: s4CloudLogo, available: false, badge: 'Soon' },
+        // { id: 'sop-know-errors', title: 'SOP - Know Errors', desc: 'Standard operating procedures and known errors.', logo: sopLogo, available: false, badge: 'Coming Soon' },
+        // { id: 'nlp-analysis', title: 'NLP Analysis', desc: 'Natural language processing insights.', logo: nlpLogo, available: true, badge: 'Live' },
     ];
 
     return (
@@ -297,7 +297,7 @@ const SelfServiceActions = () => {
             {openBotId && (
                 <div className="ssa-overlay" onClick={e => e.target === e.currentTarget && setOpenBotId(null)}>
                     {openBotId === 's4' && <SapChatBot onClose={() => setOpenBotId(null)} />}
-                    {openBotId === 'nlp-analysis' && <NlpChatBot onClose={() => setOpenBotId(null)} />}
+                    {/* {openBotId === 'nlp-analysis' && <NlpChatBot onClose={() => setOpenBotId(null)} />} */}
                 </div>
             )}
         </div>

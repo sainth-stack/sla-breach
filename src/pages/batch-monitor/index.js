@@ -1,28 +1,53 @@
 /**
  * Background Job Monitoring (/process-monitor/thanksgiving)
- * API: {baseURL}/jobs/Z_I_FA_JOBS → { "d": { "results": [ { JobName, RunTimeSeconds, ... } ] } }
+ * API: backgroundJobMonitorFeedURL → JSON array or OData { d: { results } } (same row shape: JobName, RunTimeSeconds, …)
  * - Table columns: Jobname, Runtime, Avg run time, Scheduled start date, Execution time (ExecutionStartDate), Actual end date, Status, Scheduled by
  * - Row highlight when runtime exceeds 15-day avg + tolerance (stats computed in background)
  */
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import axios from 'axios';
-import { backgroundJobMonitorBaseURL, configurationJobsURL, configurationGlobalIntervalsURL } from '../../const';
+import { backgroundJobMonitorFeedURL, configurationJobsURL, configurationGlobalIntervalsURL } from '../../const';
 import { parseIntervalToMs } from '../../utils/parseIntervalTime';
 import './index.css';
 
-/** Job/entity set options for selector; API path is /jobs/{value} */
-const JOB_OPTIONS = [
-  { value: 'Z_I_FA_JOBS', label: 'Z_I_FA_JOBS' },
-  { value: 'Z_C_JOBHEADER', label: 'Z_C_JOBHEADER' },
-];
-
-/** Parse OData /Date(ms)/ to timestamp */
-const parseODataDate = (val) => {
-  if (val == null) return null;
-  if (typeof val === 'number') return val;
-  const m = String(val).match(/\/Date\((\d+)\)\//);
-  return m ? parseInt(m[1], 10) : null;
+/** Parse OData /Date(ms)/, ISO date string, or epoch number → ms since epoch, or null */
+const parseDateValueToMs = (val) => {
+  if (val == null || val === '') return null;
+  if (typeof val === 'number' && !Number.isNaN(val)) return val;
+  const s = String(val);
+  const m = s.match(/\/Date\((\d+)(?:[+-]\d+)?\)\//);
+  if (m) return parseInt(m[1], 10);
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? null : d.getTime();
 };
+
+/** SAP-style HHMMSS (e.g. "093020") combined with date-only ms → local timestamp ms */
+const applySapTimeToMs = (dateMs, timeStr) => {
+  if (dateMs == null) return null;
+  if (timeStr == null || String(timeStr).trim() === '') return dateMs;
+  const t = String(timeStr).replace(/\D/g, '');
+  if (t.length < 4) return dateMs;
+  const h = parseInt(t.slice(0, 2), 10) || 0;
+  const min = parseInt(t.slice(2, 4), 10) || 0;
+  const sec = t.length >= 6 ? parseInt(t.slice(4, 6), 10) || 0 : 0;
+  const d = new Date(dateMs);
+  d.setHours(h, min, sec, 0);
+  return d.getTime();
+};
+
+const getRowTimestampMs = (row, dateKey, timeKey) => {
+  const base = parseDateValueToMs(row[dateKey]);
+  if (base == null) return null;
+  if (timeKey != null && row[timeKey] != null && row[timeKey] !== '') {
+    return applySapTimeToMs(base, row[timeKey]);
+  }
+  return base;
+};
+
+const getRowExecutionOrScheduleMs = (row) =>
+  getRowTimestampMs(row, 'ExecutionStartDate', 'ExecutionStartTime') ??
+  getRowTimestampMs(row, 'ScheduledStartDate', 'ScheduledStartTime') ??
+  getRowTimestampMs(row, 'ActualEndDate', 'ActualEndTime');
 
 /** Compute mean of numbers */
 const mean = (arr) => {
@@ -64,20 +89,20 @@ const DISPLAY_COLUMNS = [
 ];
 
 const formatScheduledStart = (row) => {
-  const ms = parseODataDate(row.ScheduledStartDate);
+  const ms = getRowTimestampMs(row, 'ScheduledStartDate', 'ScheduledStartTime');
   if (ms == null) return '—';
   return new Date(ms).toLocaleString();
 };
 
 const formatActualEnd = (row) => {
-  const ms = parseODataDate(row.ActualEndDate);
+  const ms = getRowTimestampMs(row, 'ActualEndDate', 'ActualEndTime');
   if (ms == null) return '—';
   return new Date(ms).toLocaleString();
 };
 
-/** Execution start from API OData date (e.g. "/Date(1776816000000)/") */
+/** Execution start: OData /Date()/ or ISO date + optional ExecutionStartTime */
 const formatExecutionStart = (row) => {
-  const ms = parseODataDate(row.ExecutionStartDate);
+  const ms = getRowTimestampMs(row, 'ExecutionStartDate', 'ExecutionStartTime');
   if (ms == null) return '—';
   return new Date(ms).toLocaleString();
 };
@@ -114,7 +139,6 @@ const formatDisplayCell = (row, col) => {
 const DEFAULT_POLL_MS = 5 * 60 * 1000;
 
 const BackgroundJobMonitoring = () => {
-  const [selectedJob, setSelectedJob] = useState(JOB_OPTIONS[0]?.value || 'Z_I_FA_JOBS');
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -129,8 +153,6 @@ const BackgroundJobMonitoring = () => {
     () => parseIntervalToMs(jobIntervalText, DEFAULT_POLL_MS),
     [jobIntervalText]
   );
-
-  const apiUrl = `${backgroundJobMonitorBaseURL}/jobs/${selectedJob}`;
 
   const loadJobConfiguration = useCallback(async () => {
     try {
@@ -164,7 +186,7 @@ const BackgroundJobMonitoring = () => {
     try {
       if (showLoading) setLoading(true);
       setError(null);
-      const response = await axios.get(apiUrl);
+      const response = await axios.get(backgroundJobMonitorFeedURL);
       let list = response.data;
       if (Array.isArray(list)) {
         setData(list);
@@ -192,7 +214,7 @@ const BackgroundJobMonitoring = () => {
     } finally {
       setLoading(false);
     }
-  }, [apiUrl, pollIntervalMs]);
+  }, [pollIntervalMs]);
 
   useEffect(() => {
     fetchData(true);
@@ -211,7 +233,7 @@ const BackgroundJobMonitoring = () => {
     const oneDayMs = 24 * 60 * 60 * 1000;
     const lastDay = data
       .filter((r) => {
-        const ms = parseODataDate(r.ExecutionStartDate ?? r.ScheduledStartDate ?? r.ActualEndDate);
+        const ms = getRowExecutionOrScheduleMs(r);
         if (ms == null) return true;
         return now - ms <= oneDayMs;
       })
