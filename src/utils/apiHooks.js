@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { baseURL } from '../const';
+import { getStoredUser } from './authSession';
 
 // Generate a cache key based on file information
 const generateCacheKey = (fileInfo) => {
@@ -33,23 +34,13 @@ const getUploadedFileInfo = () => {
   }
 };
 
-// Get current user from localStorage (email/name for CSV filtering)
-const getCurrentUser = () => {
-  try {
-    const raw = localStorage.getItem('user');
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-};
-
 // API function to fetch CSV data (passes user email/name so backend can filter; admin gets all)
 const fetchCsvData = async (filename) => {
   if (!filename) {
     throw new Error('No filename provided');
   }
 
-  const user = getCurrentUser();
+  const user = getStoredUser();
   const params = new URLSearchParams();
   if (user?.email) params.set('email', user.email);
   if (user?.name) params.set('name', user.name);

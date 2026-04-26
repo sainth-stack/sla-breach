@@ -5,16 +5,8 @@ import { MdVisibility, MdVisibilityOff } from "react-icons/md";
 import { getDefaultPathForUser } from "../../utils/permissions";
 import { baseURL } from "../../const";
 import { sendAppLog, getLogMetaFromPath } from "../../utils/logger";
+import { getStoredUser, isAuthenticatedSession, setAuthSession } from "../../utils/authSession";
 import "./index.css";
-
-function getStoredUser() {
-  try {
-    const raw = localStorage.getItem("user");
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
 
 export function Login() {
   const [loading, setLoading] = useState(false);
@@ -25,10 +17,8 @@ export function Login() {
 
   // If already logged in, redirect to default path (same logic as post-login).
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    const isAuth = localStorage.getItem("isAuthenticated") === "true";
     const user = getStoredUser();
-    if (token && isAuth && user) {
+    if (isAuthenticatedSession() && user) {
       const defaultPath = getDefaultPathForUser(!!(user.isSuperAdmin), user.allowedPaths ?? null);
       navigate(defaultPath, { replace: true });
     }
@@ -64,9 +54,7 @@ export function Login() {
           allowedPaths: data.allowed_paths ?? null,
           loginTime: new Date().toISOString(),
         };
-        localStorage.setItem("user", JSON.stringify(userData));
-        localStorage.setItem("token", "authenticated");
-        localStorage.setItem("isAuthenticated", "true");
+        setAuthSession(userData);
         message.success(`Welcome ${data.name}!`);
         const defaultPath = getDefaultPathForUser(!!data.is_super_admin, data.allowed_paths ?? null);
         setTimeout(() => navigate(defaultPath), 500);

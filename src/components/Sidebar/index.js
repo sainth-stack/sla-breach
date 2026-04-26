@@ -30,21 +30,12 @@ import {
   MdManageAccounts,
   MdAssignmentInd,
   MdNotifications,
-  MdDownload,
   MdUploadFile,
 } from "react-icons/md";
 import { Link, useLocation } from "react-router-dom";
 import { getAllowedPaths } from "../../utils/permissions";
+import { getStoredUser } from "../../utils/authSession";
 import "./styles.css";
-
-function getStoredUser() {
-  try {
-    const raw = localStorage.getItem("user");
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
 
 export default function Sidebar() {
   const location = useLocation();

@@ -5,15 +5,7 @@ import { RiArrowDownSLine as ChevronDown } from 'react-icons/ri';
 import './styles.css';
 import lg1Logo from '../../assets/lg1.png';
 import lg2Logo from '../../assets/lg2.png';
-
-function getStoredUser() {
-  try {
-    const raw = localStorage.getItem('user');
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
+import { getStoredUser, clearAuthSession } from '../../utils/authSession';
 
 const Navbar = () => {
   const navigate = useNavigate();
@@ -33,7 +25,7 @@ const Navbar = () => {
   }, []);
 
   const handleLogout = () => {
-    localStorage.clear();
+    clearAuthSession();
     setUserMenuOpen(false);
     navigate('/login', { replace: true });
   };

@@ -5,22 +5,12 @@ import "./style.css";
 import { Outlet, Navigate, useLocation } from "react-router-dom";
 import { canAccessPath, getDefaultPathForUser } from "../utils/permissions";
 import { sendAppLog, getLogMetaFromPath, isAdminRoutePath } from "../utils/logger";
-
-function getStoredUser() {
-  try {
-    const raw = localStorage.getItem("user");
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
+import { getStoredUser, isAuthenticatedSession } from "../utils/authSession";
 
 export function AdminLayout() {
   const location = useLocation();
-  const token = localStorage.getItem("token");
-  const isAuthenticatedFlag = localStorage.getItem("isAuthenticated") === "true";
   const user = getStoredUser();
-  const isAuthenticated = !!token && !!isAuthenticatedFlag && !!user;
+  const isAuthenticated = !!isAuthenticatedSession();
   const isSuperAdmin = !!(user?.isSuperAdmin);
   const allowedPaths = user?.allowedPaths ?? null;
   const path = location.pathname;

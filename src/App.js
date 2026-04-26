@@ -1,4 +1,5 @@
 import "./App.css";
+import { useEffect } from "react";
 import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
 import IncidentManagement from "./pages/incident-management";
 import KEDB from "./pages/kedb";
@@ -18,7 +19,13 @@ import WebSuggestedActions from "./pages/web-suggested-actions";
 import SelfServiceActions from "./pages/self-service-actions";
 import AdminRoles from "./pages/admin/Roles";
 import AdminUsers from "./pages/admin/Users";
+import { migrateLegacyAuthSession } from "./utils/authSession";
+
 function App() {
+  useEffect(() => {
+    migrateLegacyAuthSession();
+  }, []);
+
   return (
     <Router>
       <div className="App">
