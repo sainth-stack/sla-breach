@@ -90,9 +90,9 @@ const SearchModal = ({ isOpen, onClose, description, ticketId, searchType }) => 
 
     const getModalTitle = () => {
         if (searchType === 'similarity') {
-            return 'Contextual Search - KEDB';
+            return 'AI Context Lookup';
         } else if (searchType === 'webSearch') {
-            return 'Bainocular Web Search';
+            return 'AI Power Search';
         }
         return 'Search Results';
     };
