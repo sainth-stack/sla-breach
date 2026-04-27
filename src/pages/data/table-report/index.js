@@ -1,7 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import Papa from 'papaparse';
 import SharedFilters from '../filter/sharedReport';
 import SearchModal from '../../../components/SearchModal';
+
+const NUMERIC_SORT_KEYS = new Set(['totalTime', 'elapsedTime', 'timeToBreach']);
 
 const TableReport = ({ data, filters, onFilterChange, onResetFilters, getUniqueValues }) => {
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
@@ -15,8 +17,8 @@ const TableReport = ({ data, filters, onFilterChange, onResetFilters, getUniqueV
     { key: 'priority', name: 'Priority' },
     { key: 'assignedTo', name: 'Assigned To' },
     { key: 'marconaName', name: 'Macro Area - Name' },
-    { key: 'similaritySearch', name: 'Similarity Search' },
-    { key: 'webSearch', name: 'Web Search' },
+    { key: 'similaritySearch', name: 'Contextual Search' },
+    { key: 'webSearch', name: 'Bainocular Web Search' },
     { key: 'currentStatus', name: 'Current Status' },
     { key: 'totalTime', name: 'Resolution SLA Time' },
     { key: 'elapsedTime', name: 'Elapsed Time (h)' },
@@ -24,9 +26,17 @@ const TableReport = ({ data, filters, onFilterChange, onResetFilters, getUniqueV
     { key: 'isBreached', name: 'Breached' }
   ];
 
-  const NUMERIC_SORT_KEYS = new Set(['totalTime', 'elapsedTime', 'timeToBreach']);
+  const getColumnStyle = (columnKey) => {
+    if (columnKey === 'webSearch') {
+      return { minWidth: '190px', width: '190px', whiteSpace: 'nowrap' };
+    }
+    if (columnKey === 'similaritySearch') {
+      return { minWidth: '160px', width: '160px', whiteSpace: 'nowrap' };
+    }
+    return {};
+  };
 
-  const compareCellValues = (key, aRaw, bRaw) => {
+  const compareCellValues = useCallback((key, aRaw, bRaw) => {
     if (NUMERIC_SORT_KEYS.has(key)) {
       const na = parseFloat(aRaw);
       const nb = parseFloat(bRaw);
@@ -49,7 +59,7 @@ const TableReport = ({ data, filters, onFilterChange, onResetFilters, getUniqueV
     const as = String(aRaw);
     const bs = String(bRaw);
     return as.localeCompare(bs, undefined, { numeric: true, sensitivity: 'base' });
-  };
+  }, []);
 
   // Sort data
   const sortedData = useMemo(() => {
@@ -59,7 +69,7 @@ const TableReport = ({ data, filters, onFilterChange, onResetFilters, getUniqueV
       const cmp = compareCellValues(sortConfig.key, a[sortConfig.key], b[sortConfig.key]);
       return sortConfig.direction === 'asc' ? cmp : -cmp;
     });
-  }, [data, sortConfig]);
+  }, [data, sortConfig, compareCellValues]);
 
   // Pagination
   const paginatedData = sortedData.slice(
@@ -171,7 +181,10 @@ const TableReport = ({ data, filters, onFilterChange, onResetFilters, getUniqueV
                       requestSort(column.key);
                     }
                   }}
-                  style={{ cursor: column.key !== 'similaritySearch' && column.key !== 'webSearch' ? 'pointer' : 'default' }}
+                  style={{
+                    cursor: column.key !== 'similaritySearch' && column.key !== 'webSearch' ? 'pointer' : 'default',
+                    ...getColumnStyle(column.key),
+                  }}
                 >
                   <div className="flex items-center">
                     {column.name}

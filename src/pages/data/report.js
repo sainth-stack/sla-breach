@@ -85,7 +85,7 @@ const Report = ({ data }) => {
   if (!headerIndices) return <div>Loading report...</div>;
 
   return (
-    <div className="mx-auto p-6 bg-white rounded-lg shadow-md" style={{marginTop:'30px'}}>
+    <div className="mx-auto p-0 bg-white rounded-lg">
       <div className="mb-8">
         {/* <h1 className="text-2xl font-bold text-gray-800 mb-2">
           Complete Report

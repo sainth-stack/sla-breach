@@ -58,10 +58,13 @@ const ReportViewer = ({ rawData, headerIndices }) => {
   
     return Object.values(ticketGroups).map(ticketRows => {
       const lastRow = ticketRows[ticketRows.length - 1];
+      const creationDate =
+        ticketRows.find((row) => row[COLUMNS.CREATION_DATE])?.[COLUMNS.CREATION_DATE] ||
+        lastRow[COLUMNS.CREATION_DATE];
       
       return {
         ticketId: lastRow[COLUMNS.TICKET_ID],
-        creationDate: lastRow[COLUMNS.CREATION_DATE],
+        creationDate,
         priority: lastRow[COLUMNS.PRIORITY],
         assignedTo: lastRow[COLUMNS.ASSIGNED_TO],
         marconaName: lastRow[COLUMNS.MARCO],
