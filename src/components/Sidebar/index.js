@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { RiArrowDownSLine, RiArrowRightSLine } from "react-icons/ri";
 import {
   MdDashboard,
@@ -31,11 +31,42 @@ import {
   MdAssignmentInd,
   MdNotifications,
   MdUploadFile,
+  MdUnfoldLess,
+  MdUnfoldMore,
 } from "react-icons/md";
 import { Link, useLocation } from "react-router-dom";
 import { getAllowedPaths } from "../../utils/permissions";
 import { getStoredUser } from "../../utils/authSession";
 import "./styles.css";
+
+/** Nested groups under BAInocular (not the root BAInocular toggle). Collapse-all targets these only. */
+const NESTED_SECTION_KEYS = [
+  "dataSourceGroup",
+  "sla",
+  "incidentManagement",
+  "troubleshooting",
+  "batchPerformance",
+  "resourceEffectiveness",
+  "areasOfImprovement",
+  "continuousImprovements",
+  "effectivenessOfMeasures",
+  "admin",
+];
+
+const INITIAL_EXPANDED = {
+  amsProEn: false,
+  admin: false,
+  sla: false,
+  incidentManagement: false,
+  troubleshooting: false,
+  batchPerformance: false,
+  backgroundJobMonitoring: false,
+  resourceEffectiveness: false,
+  areasOfImprovement: false,
+  continuousImprovements: false,
+  effectivenessOfMeasures: false,
+  dataSourceGroup: false,
+};
 
 export default function Sidebar() {
   const location = useLocation();
@@ -46,20 +77,7 @@ export default function Sidebar() {
   const canShow = (path) => allowedPaths === null || (allowedPaths && allowedPaths.includes(path));
   const canShowAdmin = isSuperAdmin;
 
-  const [expandedSections, setExpandedSections] = useState({
-    amsProEn: false,
-    admin: false,
-    sla: false,
-    incidentManagement: false,
-    troubleshooting: false,
-    batchPerformance: false,
-    backgroundJobMonitoring: false,
-    resourceEffectiveness: false,
-    areasOfImprovement: false,
-    continuousImprovements: false,
-    effectivenessOfMeasures: false,
-    dataSourceGroup: false,
-  });
+  const [expandedSections, setExpandedSections] = useState(() => ({ ...INITIAL_EXPANDED }));
 
   useEffect(() => {
     const p = location.pathname;
@@ -79,9 +97,53 @@ export default function Sidebar() {
     }));
   };
 
+  const hasAnyNestedOpen = useMemo(
+    () => NESTED_SECTION_KEYS.some((key) => expandedSections[key]),
+    [expandedSections]
+  );
+
+  const hasAnyNestedClosed = useMemo(
+    () => NESTED_SECTION_KEYS.some((key) => !expandedSections[key]),
+    [expandedSections]
+  );
+
+  /** Closes every nested submenu under BAInocular. */
+  const collapseAllSubmenus = useCallback(() => {
+    setExpandedSections((prev) => {
+      const next = { ...prev };
+      NESTED_SECTION_KEYS.forEach((key) => {
+        next[key] = false;
+      });
+      return next;
+    });
+  }, []);
+
+  /** Opens every nested submenu under BAInocular. */
+  const expandAllSubmenus = useCallback(() => {
+    setExpandedSections((prev) => {
+      const next = { ...prev };
+      NESTED_SECTION_KEYS.forEach((key) => {
+        next[key] = true;
+      });
+      return next;
+    });
+  }, []);
+
+  const handleBulkToggleFromHeader = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (hasAnyNestedOpen) {
+      collapseAllSubmenus();
+      return;
+    }
+
+    expandAllSubmenus();
+  }, [hasAnyNestedOpen, collapseAllSubmenus, expandAllSubmenus]);
+
   return (
     <div className="main-container1">
-      <nav className="sidebar">
+      <nav className="sidebar" aria-label="Main navigation">
         <ul className="sidebar-list">
           {/* AMS ProEn Main Section */}
           <li className="sidebar-section main-section">
@@ -95,10 +157,28 @@ export default function Sidebar() {
                 <MdDashboard size={18} className="section-icon" />
                 <span className="section-title" style={{textTransform: ''}}>BAInocular</span>
               </div>
-              {expandedSections.amsProEn ? 
-                <RiArrowDownSLine size={18} className="chevron-icon" /> : 
-                <RiArrowRightSLine size={18} className="chevron-icon" />
-              }
+              <div className="main-header-actions">
+                {expandedSections.amsProEn && (
+                  <button
+                    type="button"
+                    className="main-header-action-btn"
+                    onClick={handleBulkToggleFromHeader}
+                    disabled={!hasAnyNestedOpen && !hasAnyNestedClosed}
+                    title={hasAnyNestedOpen ? "Collapse all submenus" : "Expand all submenus"}
+                    aria-label={hasAnyNestedOpen ? "Collapse all submenus" : "Expand all submenus"}
+                  >
+                    {hasAnyNestedOpen ? (
+                      <MdUnfoldLess size={18} aria-hidden />
+                    ) : (
+                      <MdUnfoldMore size={18} aria-hidden />
+                    )}
+                  </button>
+                )}
+                {expandedSections.amsProEn ? 
+                  <RiArrowDownSLine size={18} className="chevron-icon" /> : 
+                  <RiArrowRightSLine size={18} className="chevron-icon" />
+                }
+              </div>
             </div>
             {expandedSections.amsProEn && (
               <div className="main-content">
