@@ -112,6 +112,7 @@ const formatJobStatus = (row) => {
   if (raw == null || raw === '') return '—';
   const s = String(raw).trim();
   if (s.toUpperCase() === 'F') return 'Failed';
+  if (s.toUpperCase() === 'A') return 'Failed';
   return s;
 };
 

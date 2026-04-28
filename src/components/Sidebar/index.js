@@ -266,7 +266,7 @@ export default function Sidebar() {
                           <li className={`sidebar-item subsection ${location.pathname === "/self-monitoring" ? "active" : ""}`}>
                             <Link to="/self-monitoring" className="sidebar-link">
                               <MdVisibility size={14} className="link-icon" />
-                              <span className="link-text">Self Monitoring</span>
+                              <span className="link-text">Manage Queue</span>
                             </Link>
                           </li>
                         )}
@@ -444,7 +444,7 @@ export default function Sidebar() {
                     >
                       <div className="header-content">
                         <MdBuild size={16} className="section-icon" />
-                        <span className="section-title">Troubleshooting Assist...</span>
+                        <span className="section-title">Troubleshooting Assistance</span>
                       </div>
                       {expandedSections.troubleshooting ? (
                         <RiArrowDownSLine size={14} className="chevron-icon" />
@@ -458,7 +458,7 @@ export default function Sidebar() {
                           <li className={`sidebar-item subsection ${location.pathname === "/kedb" ? "active" : ""}`}>
                             <Link to="/kedb" className="sidebar-link">
                               <MdLightbulb size={14} className="link-icon" />
-                              <span className="link-text">Suggested Actions - Knowledge Bank</span>
+                              <span className="link-text">AI Context Lookup</span>
                             </Link>
                           </li>
                         )}
@@ -474,7 +474,7 @@ export default function Sidebar() {
                           <li className={`sidebar-item subsection ${location.pathname === "/web-suggested-actions" ? "active" : ""}`}>
                             <Link to="/web-suggested-actions" className="sidebar-link">
                               <MdSearch size={14} className="link-icon" />
-                              <span className="link-text">Suggested Actions - Web Search</span>
+                              <span className="link-text">AI Power Search</span>
                             </Link>
                           </li>
                         )}
