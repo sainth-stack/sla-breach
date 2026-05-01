@@ -65,8 +65,17 @@ const fetchCsvData = async (filename) => {
   }
 
   // Convert the API response back to array format for processing
-  const headers = Object.keys(data.records[0]);
+  // IMPORTANT: Use data.columns from backend to maintain correct column order
+  const headers = data.columns || Object.keys(data.records[0]);
   const rows = data.records.map(record => headers.map(header => record[header]));
+  
+  console.log('CSV Data loaded:', {
+    numRows: rows.length,
+    numColumns: headers.length,
+    firstFewHeaders: headers.slice(0, 10),
+    sampleRow: rows[0]?.slice(0, 10)
+  });
+  
   return [headers, ...rows];
 };
 

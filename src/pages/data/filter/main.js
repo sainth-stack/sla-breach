@@ -17,25 +17,24 @@ const ReportViewer = ({ rawData, headerIndices }) => {
     timeToBreachValue: ''
   });
 
-  // Constants for column indexes
+  // Constants for column indexes - using indexOf for dynamic lookup
   const COLUMNS = {
-    RESP_SLA: 22,
-    CREATION_DATE: 0,
-    TICKET_ID: 3,
-    PRIORITY: 4,
-    STATUS_FROM: 5,
-    STATUS_TO: 6,
-    STATUS_CHANGE_DATE: 7,
-    ASSIGNED_TO: 13,
-    CURRENT_STATUS: 15,
-    BREACHED: 20,
-    RESP_SLA: 22,
-    ELAPSED_TIME: 32,
-    resolSW: 33,
-    RESP_REM: 35,
-    MARCO:9,
+    CREATION_DATE: rawData[0].indexOf("Req. Creation Date"),
+    TICKET_ID: rawData[0].indexOf("Request - ID"),
+    PRIORITY: rawData[0].indexOf("Request - Priority Description"),
+    STATUS_FROM: rawData[0].indexOf("Historical Status - Status From"),
+    STATUS_TO: rawData[0].indexOf("Historical Status - Status To"),
+    STATUS_CHANGE_DATE: rawData[0].indexOf("Historical Status - Change Date"),
+    ASSIGNED_TO: rawData[0].indexOf("Request - Resource Assigned To - Name"),
+    CURRENT_STATUS: rawData[0].indexOf("Req. Status - Description"),
+    RESP_SLA: rawData[0].indexOf("RespSLA"),
+    ELAPSED_TIME: rawData[0].indexOf("ElapsedTime"),
+    CUMULATIVE: rawData[0].indexOf("Cumilative"),
+    resolSW: rawData[0].indexOf("ResolSOW"),
+    RESP_REM: rawData[0].indexOf("RespRem"),
+    MARCO: rawData[0].indexOf("Macro Area - Name"),
     REQ_STATUS: rawData[0].indexOf("Req. Status - Description"),
-    RESOLUTION_DATE: rawData[0].indexOf("Req. Resolution Date"),
+    RESOLUTION_DATE: rawData[0].indexOf("Req. Closing Date"),
     REQUEST_TYPE: rawData[0].indexOf("Req. Type - Description EN"),
     TEXT_REQUEST: rawData[0].indexOf("Request - Text Request"),
   };
@@ -43,7 +42,6 @@ const ReportViewer = ({ rawData, headerIndices }) => {
   const processedData = useMemo(() => {
     if (!rawData || rawData.length < 2) return [];
   
-    const headers = rawData[0];
     const rows = rawData.slice(1);
     const ticketGroups = {};
   
@@ -62,8 +60,12 @@ const ReportViewer = ({ rawData, headerIndices }) => {
         ticketRows.find((row) => row[COLUMNS.CREATION_DATE])?.[COLUMNS.CREATION_DATE] ||
         lastRow[COLUMNS.CREATION_DATE];
       
+      const cumulativeValue = lastRow[COLUMNS.CUMULATIVE];
+      const elapsedValue = lastRow[COLUMNS.ELAPSED_TIME];
+      const ticketId = lastRow[COLUMNS.TICKET_ID];
+      
       return {
-        ticketId: lastRow[COLUMNS.TICKET_ID],
+        ticketId,
         creationDate,
         priority: lastRow[COLUMNS.PRIORITY],
         assignedTo: lastRow[COLUMNS.ASSIGNED_TO],
@@ -73,7 +75,7 @@ const ReportViewer = ({ rawData, headerIndices }) => {
             ? String(lastRow[COLUMNS.TEXT_REQUEST])
             : '',
         currentStatus: lastRow[COLUMNS.CURRENT_STATUS],
-        elapsedTime: lastRow[COLUMNS.ELAPSED_TIME],
+        elapsedTime: cumulativeValue || elapsedValue || '0.00',
         isBreached:lastRow[COLUMNS.RESP_REM] <0 ? true : false,
         status: lastRow[COLUMNS.REQ_STATUS],
         resolutionDate: lastRow[COLUMNS.RESOLUTION_DATE],

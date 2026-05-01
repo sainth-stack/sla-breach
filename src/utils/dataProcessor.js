@@ -79,7 +79,19 @@ const dateUtils = {
   },
 
   formatTime: (timeStr) => {
-    if (!timeStr || typeof timeStr !== "string") return "00:00:00";
+    if (!timeStr) return "00:00:00";
+    
+    // Already formatted as HH:MM:SS
+    if (typeof timeStr === "string" && timeStr.includes(":") && timeStr.match(/^\d{1,2}:\d{2}:\d{2}$/)) {
+      const parts = timeStr.split(':');
+      return `${parts[0].padStart(2, '0')}:${parts[1]}:${parts[2]}`;
+    }
+    
+    // Handle numeric format (HHMMSS or variants)
+    if (typeof timeStr !== "string") {
+      timeStr = String(timeStr);
+    }
+    
     timeStr = timeStr.replace(/[^0-9]/g, "").padStart(6, "0");
     return timeStr.length >= 6
       ? `${timeStr.slice(0, 2)}:${timeStr.slice(2, 4)}:${timeStr.slice(4, 6)}`
@@ -116,13 +128,23 @@ const dateUtils = {
   },
 
   convertExcelDate: (excelDate) => {
+    // Already in DD/MM/YYYY format
     if (typeof excelDate === "string" && excelDate.includes("/")) {
       return excelDate;
     }
+    
+    // Handle YYYY-MM-DD format (ISO format from backend)
+    if (typeof excelDate === "string" && excelDate.match(/^\d{4}-\d{2}-\d{2}/)) {
+      const [year, month, day] = excelDate.split('-');
+      return `${day}/${month}/${year}`;
+    }
+    
+    // Handle Excel serial number
     if (typeof excelDate === "number") {
       const date = new Date(Math.round((excelDate - 25569) * 86400 * 1000));
       return date.toLocaleDateString("en-GB");
     }
+    
     return dateUtils.formatDate(excelDate);
   },
 };
@@ -482,6 +504,19 @@ export const processFileData = (data) => {
   
   const { headers, rows } = processExcelData(data);
   
+  // Debug: Check if dates are being converted properly
+  if (rows.length > 0) {
+    const firstRow = rows[0];
+    const reqCreationDateIndex = headers.indexOf("Req. Creation Date");
+    const historicalChangeDateIndex = headers.indexOf("Historical Status - Change Date");
+    console.log('Date conversion check:', {
+      creationDate: firstRow[reqCreationDateIndex],
+      changeDate: firstRow[historicalChangeDateIndex],
+      creationDateFormat: firstRow[reqCreationDateIndex]?.includes('/') ? 'DD/MM/YYYY' : 'Other',
+      changeDateFormat: firstRow[historicalChangeDateIndex]?.includes('/') ? 'DD/MM/YYYY' : 'Other'
+    });
+  }
+  
   // Extract years from the data to determine which holidays to use
   const years = [];
   const reqCreationDateIndex = headers.indexOf("Req. Creation Date");
@@ -490,18 +525,42 @@ export const processFileData = (data) => {
   rows.forEach(row => {
     // Extract year from creation date
     if (reqCreationDateIndex !== -1 && row[reqCreationDateIndex]) {
-      const dateParts = row[reqCreationDateIndex].split('/');
-      if (dateParts.length === 3) {
-        years.push(dateParts[2]);
+      const dateStr = String(row[reqCreationDateIndex]);
+      let year;
+      
+      // Handle YYYY-MM-DD format
+      if (dateStr.includes('-') && dateStr.match(/^\d{4}-\d{2}-\d{2}/)) {
+        year = dateStr.split('-')[0];
       }
+      // Handle DD/MM/YYYY format  
+      else if (dateStr.includes('/')) {
+        const dateParts = dateStr.split('/');
+        if (dateParts.length === 3) {
+          year = dateParts[2];
+        }
+      }
+      
+      if (year) years.push(year);
     }
     
     // Extract year from change date
     if (historicalChangeDateIndex !== -1 && row[historicalChangeDateIndex]) {
-      const dateParts = row[historicalChangeDateIndex].split('/');
-      if (dateParts.length === 3) {
-        years.push(dateParts[2]);
+      const dateStr = String(row[historicalChangeDateIndex]);
+      let year;
+      
+      // Handle YYYY-MM-DD format
+      if (dateStr.includes('-') && dateStr.match(/^\d{4}-\d{2}-\d{2}/)) {
+        year = dateStr.split('-')[0];
       }
+      // Handle DD/MM/YYYY format
+      else if (dateStr.includes('/')) {
+        const dateParts = dateStr.split('/');
+        if (dateParts.length === 3) {
+          year = dateParts[2];
+        }
+      }
+      
+      if (year) years.push(year);
     }
   });
   

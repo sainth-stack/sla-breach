@@ -31,8 +31,20 @@ export const MainPages = () => {
   const { csvData, holidays } = useMemo(() => {
     if (!rawCsvData) return { csvData: null, holidays: [] };
     
+    console.log('Raw CSV Data received:', {
+      numRows: rawCsvData.length - 1,
+      hasCalculatedColumns: rawCsvData[0]?.includes('Cumilative'),
+      firstRow: rawCsvData[0],
+      sampleDataRow: rawCsvData[1]
+    });
+    
     // Process the data using the utility function
     const processedData = processFileData(rawCsvData);
+    
+    console.log('After processFileData:', {
+      numRows: processedData ? processedData.length - 1 : 0,
+      sampleProcessedRow: processedData?.[1]
+    });
     
     if (!processedData || processedData.length === 0) {
       return { csvData: null, holidays: [] };
@@ -83,20 +95,21 @@ export const MainPages = () => {
       if (!headers || rows.length === 0) return [];
 
       const COLUMNS = {
-        CREATION_DATE: 0,
-        TICKET_ID: 3,
-        PRIORITY: 4,
-        STATUS_FROM: 5,
-        STATUS_TO: 6,
-        STATUS_CHANGE_DATE: 7,
-        MARCO: 9,
-        ASSIGNED_TO: 13,
-        CURRENT_STATUS: 15,
-        ELAPSED_TIME: 32,
-        resolSW: 33,
-        RESP_REM: 35,
+        CREATION_DATE: headers.indexOf("Req. Creation Date"),
+        TICKET_ID: headers.indexOf("Request - ID"),
+        PRIORITY: headers.indexOf("Request - Priority Description"),
+        STATUS_FROM: headers.indexOf("Historical Status - Status From"),
+        STATUS_TO: headers.indexOf("Historical Status - Status To"),
+        STATUS_CHANGE_DATE: headers.indexOf("Historical Status - Change Date"),
+        MARCO: headers.indexOf("Macro Area - Name"),
+        ASSIGNED_TO: headers.indexOf("Request - Resource Assigned To - Name"),
+        CURRENT_STATUS: headers.indexOf("Req. Status - Description"),
+        ELAPSED_TIME: headers.indexOf("ElapsedTime"),
+        CUMULATIVE: headers.indexOf("Cumilative"),
+        resolSW: headers.indexOf("ResolSOW"),
+        RESP_REM: headers.indexOf("RespRem"),
         REQ_STATUS: headers.indexOf("Req. Status - Description"),
-        RESOLUTION_DATE: headers.indexOf("Req. Resolution Date"),
+        RESOLUTION_DATE: headers.indexOf("Req. Closing Date"),
         REQUEST_TYPE: headers.indexOf("Req. Type - Description EN"),
         TEXT_REQUEST: headers.indexOf("Request - Text Request"),
       };
@@ -123,7 +136,7 @@ export const MainPages = () => {
               ? String(lastRow[COLUMNS.TEXT_REQUEST])
               : '',
           currentStatus: lastRow?.[COLUMNS.CURRENT_STATUS],
-          elapsedTime: lastRow?.[COLUMNS.ELAPSED_TIME],
+          elapsedTime: lastRow?.[COLUMNS.CUMULATIVE] || lastRow?.[COLUMNS.ELAPSED_TIME],
           isBreached: !isNaN(respRemVal) ? respRemVal < 0 : false,
           status: COLUMNS.REQ_STATUS !== -1 ? lastRow?.[COLUMNS.REQ_STATUS] : undefined,
           resolutionDate: COLUMNS.RESOLUTION_DATE !== -1 ? lastRow?.[COLUMNS.RESOLUTION_DATE] : undefined,
