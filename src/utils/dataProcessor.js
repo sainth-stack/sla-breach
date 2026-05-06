@@ -757,10 +757,11 @@ export const processFileData = (data) => {
         : newRow[headerIndices.calcpredt];
 
     newRow[headerIndices.elapsedtime] = (
-      newRow[headerIndices.resolsla] === "Yes" &&
-      (newRow[headerIndices.respsla] === " " || newRow[headerIndices.respsla] === " ")
-        ? parseFloat(newRow[headerIndices.refinedpredt] || 0)
-        : parseFloat(newRow[headerIndices.refinedstdt] || 0)
+      newRow[headerIndices.resolsla] === "Yes"
+        ? (newRow[headerIndices.respsla] === "Yes"
+            ? parseFloat(newRow[headerIndices.refinedstdt] || 0)
+            : parseFloat(newRow[headerIndices.refinedpredt] || 0))
+        : 0
     ).toFixed(2);
 
     let cumulativeHours = 0;

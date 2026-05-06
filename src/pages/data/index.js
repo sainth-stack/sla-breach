@@ -30,21 +30,16 @@ export const MainPages = () => {
   // Process the raw CSV data and compute holidays using useMemo for performance
   const { csvData, holidays } = useMemo(() => {
     if (!rawCsvData) return { csvData: null, holidays: [] };
-    
-    console.log('Raw CSV Data received:', {
+
+    console.log("Raw CSV Data received:", {
       numRows: rawCsvData.length - 1,
-      hasCalculatedColumns: rawCsvData[0]?.includes('Cumilative'),
       firstRow: rawCsvData[0],
-      sampleDataRow: rawCsvData[1]
+      sampleDataRow: rawCsvData[1]?.slice(0, 41),
     });
-    
-    // Process the data using the utility function
+
+    // Always recompute using the same processing logic as the correct page.
+    // This keeps ElapsedTime/Cumilative/Remaining Time consistent for every ticket.
     const processedData = processFileData(rawCsvData);
-    
-    console.log('After processFileData:', {
-      numRows: processedData ? processedData.length - 1 : 0,
-      sampleProcessedRow: processedData?.[1]
-    });
     
     if (!processedData || processedData.length === 0) {
       return { csvData: null, holidays: [] };
@@ -107,7 +102,7 @@ export const MainPages = () => {
         ELAPSED_TIME: headers.indexOf("ElapsedTime"),
         CUMULATIVE: headers.indexOf("Cumilative"),
         resolSW: headers.indexOf("ResolSOW"),
-        RESP_REM: headers.indexOf("RespRem"),
+        RESOL_REM: headers.indexOf("ResolRem"),
         REQ_STATUS: headers.indexOf("Req. Status - Description"),
         RESOLUTION_DATE: headers.indexOf("Req. Closing Date"),
         REQUEST_TYPE: headers.indexOf("Req. Type - Description EN"),
@@ -124,7 +119,7 @@ export const MainPages = () => {
       const dataset = [];
       for (const [, ticketRows] of groups) {
         const lastRow = ticketRows[ticketRows.length - 1];
-        const respRemVal = parseFloat(lastRow?.[COLUMNS.RESP_REM]);
+        const resolRemVal = parseFloat(lastRow?.[COLUMNS.RESOL_REM]);
         dataset.push({
           ticketId: lastRow?.[COLUMNS.TICKET_ID],
           creationDate: lastRow?.[COLUMNS.CREATION_DATE],
@@ -137,10 +132,10 @@ export const MainPages = () => {
               : '',
           currentStatus: lastRow?.[COLUMNS.CURRENT_STATUS],
           elapsedTime: lastRow?.[COLUMNS.CUMULATIVE] || lastRow?.[COLUMNS.ELAPSED_TIME],
-          isBreached: !isNaN(respRemVal) ? respRemVal < 0 : false,
+          isBreached: !isNaN(resolRemVal) ? resolRemVal < 0 : false,
           status: COLUMNS.REQ_STATUS !== -1 ? lastRow?.[COLUMNS.REQ_STATUS] : undefined,
           resolutionDate: COLUMNS.RESOLUTION_DATE !== -1 ? lastRow?.[COLUMNS.RESOLUTION_DATE] : undefined,
-          timeToBreach: lastRow?.[COLUMNS.RESP_REM],
+          timeToBreach: lastRow?.[COLUMNS.RESOL_REM],
           totalTime: lastRow?.[COLUMNS.resolSW],
           requestType: COLUMNS.REQUEST_TYPE !== -1 ? lastRow?.[COLUMNS.REQUEST_TYPE] : undefined,
         });
