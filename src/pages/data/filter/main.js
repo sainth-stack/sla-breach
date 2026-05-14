@@ -3,7 +3,7 @@ import TableReport from '../table-report/index';
 import '../table-report/TableReport.css'
 import { useReportData } from '../../../utils/apiHooks';
 
-const ReportViewer = ({ rawData, headerIndices }) => {
+const ReportViewer = () => {
   const [filters, setFilters] = useState({
     requestType: [], // Added Request Type filter
     creationDateFrom: null,
