@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import Report from "./report";
@@ -12,6 +12,7 @@ import { useCsvData } from "../../utils/apiHooks";
 export const MainPages = () => {
   // Use React Query hooks for caching and API state management
   const { data: rawCsvData, isLoading, error: queryError, isError } = useCsvData();
+  const [isDownloading, setIsDownloading] = useState(false);
 
   // Simplified function since heavy lifting is done in the utility - moved before useMemo
   const getHolidaysForYears = (years) => {
@@ -82,70 +83,69 @@ export const MainPages = () => {
     return null;
   }, [isError, queryError, rawCsvData, csvData]);
 
-  // Build dataset for chatbot from processed table (grouped by ticket) - memoized
+  // Build dataset for chatbot from backend API
   const chatDataset = useMemo(() => {
-    if (!csvData) return [];
-    try {
-      const [headers, ...rows] = csvData;
-      if (!headers || rows.length === 0) return [];
+    // Chat dataset will be fetched from backend when needed by the chatbot
+    return [];
+  }, []);
 
-      const COLUMNS = {
-        CREATION_DATE: headers.indexOf("Req. Creation Date"),
-        TICKET_ID: headers.indexOf("Request - ID"),
-        PRIORITY: headers.indexOf("Request - Priority Description"),
-        STATUS_FROM: headers.indexOf("Historical Status - Status From"),
-        STATUS_TO: headers.indexOf("Historical Status - Status To"),
-        STATUS_CHANGE_DATE: headers.indexOf("Historical Status - Change Date"),
-        MARCO: headers.indexOf("Macro Area - Name"),
-        ASSIGNED_TO: headers.indexOf("Request - Resource Assigned To - Name"),
-        CURRENT_STATUS: headers.indexOf("Req. Status - Description"),
-        ELAPSED_TIME: headers.indexOf("ElapsedTime"),
-        CUMULATIVE: headers.indexOf("Cumilative"),
-        resolSW: headers.indexOf("ResolSOW"),
-        RESOL_REM: headers.indexOf("ResolRem"),
-        REQ_STATUS: headers.indexOf("Req. Status - Description"),
-        RESOLUTION_DATE: headers.indexOf("Req. Closing Date"),
-        REQUEST_TYPE: headers.indexOf("Req. Type - Description EN"),
-        TEXT_REQUEST: headers.indexOf("Request - Text Request"),
+  // Handle download full report
+  const handleDownloadReport = async () => {
+    setIsDownloading(true);
+    try {
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const fileInfo = JSON.parse(localStorage.getItem('uploadedFile') || '{}');
+      const filename = fileInfo?.serverFilename || 'data1.csv';
+      
+      const body = {
+        filename,
+        email: user?.email,
+        name: user?.name,
+        filters: {
+          requestType: [],
+          creationDateFrom: null,
+          creationDateTo: null,
+          priority: [],
+          assignedTo: [],
+          status: [],
+          breached: [],
+          marconaName: [],
+          searchText: '',
+          timeToBreachOption: 'eq',
+          timeToBreachValue: ''
+        },
+        sort: {
+          key: null,
+          direction: 'asc'
+        }
       };
 
-      const groups = new Map();
-      rows.forEach((row) => {
-        const id = row[COLUMNS.TICKET_ID];
-        if (!groups.has(id)) groups.set(id, []);
-        groups.get(id).push(row);
+      const response = await fetch(`${baseURL}/sla_breach/export_csv`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body)
       });
 
-      const dataset = [];
-      for (const [, ticketRows] of groups) {
-        const lastRow = ticketRows[ticketRows.length - 1];
-        const resolRemVal = parseFloat(lastRow?.[COLUMNS.RESOL_REM]);
-        dataset.push({
-          ticketId: lastRow?.[COLUMNS.TICKET_ID],
-          creationDate: lastRow?.[COLUMNS.CREATION_DATE],
-          priority: lastRow?.[COLUMNS.PRIORITY],
-          assignedTo: lastRow?.[COLUMNS.ASSIGNED_TO],
-          marconaName: lastRow?.[COLUMNS.MARCO],
-          textRequest:
-            COLUMNS.TEXT_REQUEST >= 0 && lastRow?.[COLUMNS.TEXT_REQUEST] != null
-              ? String(lastRow[COLUMNS.TEXT_REQUEST])
-              : '',
-          currentStatus: lastRow?.[COLUMNS.CURRENT_STATUS],
-          elapsedTime: lastRow?.[COLUMNS.CUMULATIVE] || lastRow?.[COLUMNS.ELAPSED_TIME],
-          isBreached: !isNaN(resolRemVal) ? resolRemVal < 0 : false,
-          status: COLUMNS.REQ_STATUS !== -1 ? lastRow?.[COLUMNS.REQ_STATUS] : undefined,
-          resolutionDate: COLUMNS.RESOLUTION_DATE !== -1 ? lastRow?.[COLUMNS.RESOLUTION_DATE] : undefined,
-          timeToBreach: lastRow?.[COLUMNS.RESOL_REM],
-          totalTime: lastRow?.[COLUMNS.resolSW],
-          requestType: COLUMNS.REQUEST_TYPE !== -1 ? lastRow?.[COLUMNS.REQUEST_TYPE] : undefined,
-        });
+      if (!response.ok) {
+        throw new Error('Download failed');
       }
-      return dataset;
-    } catch (e) {
-      console.error('Failed to build chat dataset:', e);
-      return [];
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `sla-full-report-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Download error:', error);
+      alert('Failed to download report. Please try again.');
+    } finally {
+      setIsDownloading(false);
     }
-  }, [csvData]);
+  };
 
 
   if (isLoading) {
@@ -210,7 +210,56 @@ export const MainPages = () => {
           <h1 className="text-2xl font-bold text-blue-800">
             SLA Monitoring
           </h1>
-
+          
+          {/* Download Full Report Button */}
+          <button
+            onClick={handleDownloadReport}
+            disabled={isDownloading || !csvData}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
+          >
+            {isDownloading ? (
+              <>
+                <svg
+                  className="animate-spin h-5 w-5"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  ></circle>
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  ></path>
+                </svg>
+                Downloading...
+              </>
+            ) : (
+              <>
+                <svg 
+                  className="h-5 w-5" 
+                  fill="none" 
+                  viewBox="0 0 24 24" 
+                  stroke="currentColor"
+                >
+                  <path 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                    strokeWidth={2} 
+                    d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" 
+                  />
+                </svg>
+                Download Report
+              </>
+            )}
+          </button>
         </div>
 
         {csvData && (
