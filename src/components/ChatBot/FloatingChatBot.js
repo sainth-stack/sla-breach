@@ -4,7 +4,7 @@ import { IoMdClose, IoMdSend, IoMdAttach } from 'react-icons/io';
 import { Table } from 'antd';
 import Plot from 'react-plotly.js';
 import axios from 'axios';
-import { baseURL } from '../../const';
+import { baseURL, classificationSentenceURL } from '../../const';
 import './FloatingChatBot.css';
 const testUrl = 'http://54.169.213.200:4006';
 const FloatingChatBot = ({
@@ -120,8 +120,7 @@ const FloatingChatBot = ({
       let data;
       if (endpoint === "/classification/" || endpoint === "/classification") {
         // External classifier API: return only z_review
-        const classifierUrl = 'https://ams-classifier.cfapps.us10-001.hana.ondemand.com/v1/classification/sentence';
-        const response = await axios.post(classifierUrl, { sentence: userMessage }, {
+        const response = await axios.post(classificationSentenceURL, { sentence: userMessage }, {
           headers: { 'Content-Type': 'application/json' }
         });
         data = response.data;
